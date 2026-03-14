@@ -355,6 +355,116 @@ def run_transcriptions(cli_path: str, utterances: list, engine: str,
     return results, latency
 
 
+def run_batch_transcription(cli_path: str, utterances: list, engine: str,
+                            model: str, timeout: int = 600) -> tuple:
+    """Transcribe using transcribe-batch CLI (model loaded once).
+
+    Falls back to per-file mode if transcribe-batch is not available.
+    """
+    # Build ref map
+    ref_map = {u[0]: (u[2], u[3]) for u in utterances}
+
+    # Collect unique directories containing audio files
+    audio_dirs = set()
+    file_to_utt = {}  # filename_stem -> utt_id
+    for utt_id, audio_path, ref_text, lang in utterances:
+        audio_dirs.add(str(Path(audio_path).parent))
+        stem = Path(audio_path).stem
+        file_to_utt[stem] = utt_id
+
+    # Use transcribe-batch with JSONL output
+    # For LibriSpeech, files are spread across many dirs — use the root
+    # Find common parent
+    all_paths = [Path(u[1]) for u in utterances]
+    common = all_paths[0].parent
+    for p in all_paths[1:]:
+        while not str(p).startswith(str(common)):
+            common = common.parent
+
+    hyp_dir = BENCHMARK_BASE / "librispeech" / "hyp" / f"{engine}_{model}"
+    hyp_dir.mkdir(parents=True, exist_ok=True)
+
+    cmd = [cli_path, "transcribe-batch", str(common),
+           "--engine", engine, "--jsonl",
+           "--output-dir", str(hyp_dir)]
+    if engine in ("qwen3", "qwen3-coreml", "qwen3-coreml-full"):
+        cmd.extend(["--model", model])
+
+    print(f"  Running batch transcription on {common}...")
+    print(f"  Command: {' '.join(cmd[:6])}...")
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=timeout * len(utterances))
+    except subprocess.TimeoutExpired:
+        print("  Batch transcription timed out, falling back to per-file mode")
+        return run_transcriptions(cli_path, utterances, engine, model,
+                                  timeout, measure_warmup=True)
+
+    if result.returncode != 0:
+        print(f"  transcribe-batch failed: {result.stderr[:200]}")
+        print("  Falling back to per-file mode")
+        return run_transcriptions(cli_path, utterances, engine, model,
+                                  timeout, measure_warmup=True)
+
+    # Parse JSONL output
+    results = []
+    latency = {}
+    batch_results = {}
+
+    for line in result.stdout.strip().split("\n"):
+        line = line.strip()
+        if not line or not line.startswith("{"):
+            # Parse summary lines for latency
+            m = re.search(r"Model load:\s*([\d.]+)s.*Warmup:\s*([\d.]+)s", line)
+            if m:
+                latency["model_load_time"] = float(m.group(1))
+                latency["warmup_time"] = float(m.group(2))
+            m = re.search(r"Aggregate RTF:\s*([\d.]+)", line)
+            if m:
+                latency["aggregate_rtf"] = float(m.group(1))
+            continue
+        try:
+            entry = json.loads(line)
+            batch_results[entry["file"]] = entry
+        except (json.JSONDecodeError, KeyError):
+            continue
+
+    # Match with reference transcripts
+    for utt_id, audio_path, ref_text, lang in utterances:
+        stem = Path(audio_path).stem
+        if stem not in batch_results:
+            results.append({"utterance_id": utt_id, "error": "not_in_batch"})
+            continue
+
+        entry = batch_results[stem]
+        if "error" in entry:
+            results.append({"utterance_id": utt_id, "error": entry["error"]})
+            continue
+
+        wer_result = compute_wer(ref_text, entry["text"])
+        results.append({
+            "utterance_id": utt_id,
+            "reference": normalize_text(ref_text),
+            "hypothesis": normalize_text(entry["text"]),
+            "language": lang,
+            "wer": wer_result["wer"],
+            "substitutions": wer_result["substitutions"],
+            "insertions": wer_result["insertions"],
+            "deletions": wer_result["deletions"],
+            "ref_words": wer_result["ref_words"],
+            "rtf": entry.get("rtf", 0),
+            "inference_time": entry.get("time", 0),
+        })
+
+    scored = len([r for r in results if "error" not in r])
+    failed = len([r for r in results if "error" in r])
+    print(f"  Batch: {scored} transcribed, {failed} failed")
+
+    return results, latency
+
+
 # ---------------------------------------------------------------------------
 # Aggregation & reporting
 # ---------------------------------------------------------------------------
@@ -513,6 +623,8 @@ def main():
                         help="Only download test data")
     parser.add_argument("--score-only", action="store_true",
                         help="Re-score existing hypothesis transcriptions")
+    parser.add_argument("--batch", action="store_true",
+                        help="Use transcribe-batch CLI (loads model once, much faster)")
     parser.add_argument("--compare", action="store_true",
                         help="Run all engine/model combinations")
     args = parser.parse_args()
@@ -570,6 +682,10 @@ def main():
                 **wer_result,
             })
         latency = {}
+    elif args.batch:
+        print(f"\nBatch transcribing with {args.engine}/{args.model}...")
+        per_file, latency = run_batch_transcription(
+            args.cli_path, utterances, args.engine, args.model, args.timeout)
     else:
         print(f"\nTranscribing with {args.engine}/{args.model}...")
         per_file, latency = run_transcriptions(
