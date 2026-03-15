@@ -10,6 +10,7 @@
 | Model | Engine | Bits | Size | WER% | RTF | Model Load | Warmup |
 |-------|--------|------|------|------|-----|------------|--------|
 | Qwen3-ASR 1.7B | MLX (GPU) | 8-bit | 2.3 GB | 2.35 | 0.090 | 5.1s | 0.8s |
+| Qwen3-ASR 1.7B | MLX (GPU) | 4-bit | 1.2 GB | 2.57 | 0.045 | 3.2s | 0.4s |
 | Parakeet TDT 0.6B | CoreML (ANE) | INT8 | 634 MB | 2.74 | 0.089 | 128.9s | 2.0s |
 | Qwen3-ASR 0.6B | MLX (GPU) | 8-bit | 960 MB | 2.80 | 0.025 | 2.4s | 0.3s |
 | Qwen3-ASR 0.6B | MLX (GPU) | 4-bit | 675 MB | 3.34 | 0.023 | 2.4s | 0.3s |
@@ -20,7 +21,7 @@
 **Key observations:**
 - Parakeet INT8 achieves the best WER (2.74%) but has a slow cold start (128.9s CoreML compilation)
 - Qwen3-ASR MLX is 10x faster to load (2.4s vs 23-129s) and has the fastest RTF (0.023)
-- Parakeet INT8 is 3.3x faster than INT4 (RTF 0.089 vs 0.298, verified over 3 runs). Likely cause: ANE has native INT8 multiply-accumulate, while INT4 k-means palettization requires per-weight lookup table indirection. CoreML may also route INT4 ops to CPU instead of ANE
+- Parakeet INT8 is 3.3x faster than INT4 (RTF 0.089 vs 0.298, verified over 3 runs). Apple does not document the cause publicly. Possible factors: ANE native INT8 ops vs INT4 lookup table indirection, or different compute unit routing
 - CoreML cold start (first-ever load) compiles a device-specific execution plan: 129s for INT8, 23s for INT4. Warm start (cached) is 5.4s — CoreML caches compiled plans in `~/Library/Caches/com.apple.CoreML/`. The 129s only happens once per device. Encoder currently uses `.all` compute units; switching to `.cpuAndNeuralEngine` would skip GPU plan compilation
 
 ## Comparison with published models
@@ -29,6 +30,7 @@
 |-------|--------|------|-----------|-------------------|--------|
 | **Qwen3-ASR 1.7B 8-bit** | **1.7B** | **2.3 GB** | **8-bit** | **2.35** | **This benchmark** |
 | Whisper Large v3 Turbo | 809M | 1.6 GB | FP16 | 2.5 | OpenAI (2024) |
+| **Qwen3-ASR 1.7B 4-bit** | **1.7B** | **1.2 GB** | **4-bit** | **2.57** | **This benchmark** |
 | Whisper Large v3 | 1.5B | 3.1 GB | FP16 | 2.7 | OpenAI (2023) |
 | **Parakeet TDT 0.6B INT8** | **600M** | **634 MB** | **INT8** | **2.74** | **This benchmark** |
 | **Qwen3-ASR 0.6B 8-bit** | **600M** | **960 MB** | **8-bit** | **2.80** | **This benchmark** |
