@@ -44,22 +44,22 @@ Whisper numbers from original papers (FP16 inference).
 
 ## Multilingual results (FLEURS)
 
-Qwen3-ASR 0.6B 4-bit on FLEURS test splits. CER used for CJK languages (no word boundaries).
+CER used for CJK languages (no word boundaries). Parakeet is English-only (25 European languages).
 
-| Language | Code | Metric | Error% | Utterances |
-|----------|------|--------|--------|-----------|
-| Spanish | es_419 | WER | 6.44 | 908 |
-| English | en_us | WER | 6.57 | 647 |
-| Chinese | cmn_hans_cn | CER | 8.41 | 945 |
-| German | de_de | WER | 9.45 | 862 |
-| French | fr_fr | WER | 11.42 | 676 |
-| Japanese | ja_jp | CER | 16.11 | 650 |
-| Russian | ru_ru | WER | 16.35 | 775 |
-| Korean | ko_kr | WER | 19.95 | 382 |
-| Hindi | hi_in | WER | 25.93 | 418 |
-| Arabic | ar_eg | WER | 33.47 | 428 |
+| Language | Metric | Qwen3 4-bit | Qwen3 8-bit | Parakeet INT4 | Parakeet INT8 |
+|----------|--------|-------------|-------------|---------------|---------------|
+| Spanish | WER | 6.44 | 5.06 | — | — |
+| English | WER | 6.57 | 5.64 | pending | pending |
+| Chinese | CER | 8.41 | 7.71 | — | — |
+| German | WER | 9.45 | 6.81 | pending | pending |
+| French | WER | 11.42 | 8.50 | pending | pending |
+| Japanese | CER | 16.11 | 8.64 | — | — |
+| Russian | WER | 16.35 | 10.52 | — | — |
+| Korean | WER | 19.95 | 6.89 | — | — |
+| Hindi | WER | 25.93 | 18.57 | — | — |
+| Arabic | WER | 33.47 | 20.31 | — | — |
 
-Best on European languages (EN/ES/DE/FR under 12%). CJK is reasonable (ZH 8.4%, JA 16.1%). Arabic and Hindi are weaker — likely less training data for these languages in the 0.6B model.
+8-bit consistently outperforms 4-bit across all languages. Largest gains on Korean (19.95% → 6.89%, 65% reduction) and Japanese (16.11% → 8.64%, 46% reduction). European languages improve 15-30%.
 
 ## Compression delta
 
