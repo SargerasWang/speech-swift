@@ -1,8 +1,9 @@
 # ASR Word Error Rate (WER) Benchmark
 
-## Dataset
+## Datasets
 
-**LibriSpeech test-clean** — 2620 utterances, ~5.4 hours of read English speech.
+- **LibriSpeech test-clean** — 2620 utterances, ~5.4 hours, English read speech (standard ASR benchmark)
+- **CommonVoice** — multilingual (EN, ZH, DE, ES, FR), crowd-sourced read speech (requires manual download from commonvoice.mozilla.org)
 
 ## Results
 
@@ -42,14 +43,13 @@ Whisper numbers from original papers (FP16 inference).
 
 ## Compression delta
 
-How much accuracy do we lose by quantizing to lower bit widths? This matters for issue #110 (model compression experiments) — it establishes the baseline quality cost of our current quantization before trying more advanced techniques like mixed-bit allocation or outlier decomposition.
+How much accuracy do we lose by quantizing to lower bit widths? This establishes the baseline quality cost of our current quantization before trying more advanced techniques like mixed-bit allocation or outlier decomposition.
 
 | Variant | WER% | Substitutions | Insertions | Deletions | Total errors | Size |
 |---------|------|---------------|------------|-----------|-------------|------|
 | Qwen3 0.6B 8-bit | 2.80 | 1111 | 92 | 268 | 1471 | 960 MB |
 | Qwen3 0.6B 4-bit | 3.34 | 1323 | 123 | 308 | 1754 | 675 MB |
 | Delta | +0.54 | +212 | +31 | +40 | +283 | -30% |
-| | | | | | | |
 | Parakeet TDT INT8 | 2.74 | 990 | 125 | 308 | 1423 | 634 MB |
 | Parakeet TDT INT4 | 3.68 | 1279 | 138 | 493 | 1910 | 332 MB |
 | Delta | +0.94 | +289 | +13 | +185 | +487 | -48% |
@@ -69,3 +69,13 @@ python scripts/benchmark_asr.py --batch --engine parakeet --model int8
 ```
 
 First run downloads LibriSpeech test-clean (~350 MB). Results saved to `benchmarks/librispeech/`.
+
+### CommonVoice (multilingual)
+
+```bash
+# Download data manually from https://commonvoice.mozilla.org/en/datasets
+# Extract test.tsv + clips/ to benchmarks/commonvoice/<lang>/
+python scripts/benchmark_asr.py --dataset commonvoice --language en --batch
+python scripts/benchmark_asr.py --dataset commonvoice --language zh-CN --batch
+python scripts/benchmark_asr.py --dataset commonvoice --language de --batch
+```
