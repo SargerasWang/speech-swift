@@ -76,6 +76,8 @@ make test
 
 **Test organization**: Place tests in `Tests/<ModuleName>Tests/`. Follow existing patterns (e.g., `Qwen3ASRTests/`, `SpeechVADTests/`).
 
+**E2E test naming**: Prefix E2E test classes with `E2E` (e.g., `E2ETranscriptionTests`, `E2EDiarizationTests`). CI filters out E2E tests that require model downloads — only unit tests run in the pipeline. E2E tests run locally with `make test` (full suite).
+
 **What to test per category:**
 | Change | Required tests |
 |--------|---------------|

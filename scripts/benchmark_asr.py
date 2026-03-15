@@ -834,7 +834,7 @@ def main():
 
     out_dir = BENCHMARK_BASE / args.dataset
     out_dir.mkdir(parents=True, exist_ok=True)
-    suffix = f"_{args.language}" if args.dataset == "commonvoice" else ""
+    suffix = f"_{args.language}" if args.dataset in ("commonvoice", "fleurs") else ""
     out_file = out_dir / f"results_{args.engine}_{args.model}{suffix}.json"
     with open(out_file, "w") as f:
         json.dump(results, f, indent=2)
