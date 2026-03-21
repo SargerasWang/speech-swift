@@ -718,6 +718,10 @@ public class SpeechTokenizerDecoder: Module {
             let totalSamples = chunkWaveform.dim(1)
             let kept = chunkWaveform[0..., trimSamples..<totalSamples, 0...]
 
+            // Eval each chunk to free intermediate decoder tensors (480x upsample).
+            // Without this, all chunks' intermediates stay in memory as lazy graph nodes.
+            eval(kept)
+
             audioChunks.append(kept)
             offset = chunkEnd
         }
