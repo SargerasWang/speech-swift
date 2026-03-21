@@ -178,6 +178,10 @@ soniqo-web/public/
   architecture/             Module structure, backends, weight formats
 ```
 
+### README translations
+
+Translated READMEs live in the repo root: `README_zh.md`, `README_ja.md`, `README_ko.md`, `README_es.md`, `README_de.md`, `README_fr.md`, `README_hi.md`, `README_pt.md`, `README_ru.md`. **Whenever README.md is updated, all translations must be updated to match.** Each translation links back to the main README and lists all available languages at the top.
+
 ### Mapping: code changes → docs pages
 
 | Code change | Local docs | soniqo-web page(s) |
