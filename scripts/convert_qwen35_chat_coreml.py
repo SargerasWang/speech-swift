@@ -196,8 +196,8 @@ class DeltaNetAttention(nn.Module):
         # Project to QKV: [1, 1, 6144]
         qkv = self.in_proj_qkv(x)  # [1, 1, 6144]
 
-        # Gate: z = silu(in_proj_z(x)), [1, 1, 2048]
-        z = F.silu(self.in_proj_z(x))
+        # Gate projection (silu applied later at gating step, NOT here)
+        z = self.in_proj_z(x)  # [1, 1, 2048]
 
         # Causal conv1d with carried state
         # conv_state: [1, 6144, 3], new input: [1, 6144, 1]
@@ -685,7 +685,15 @@ def load_weights(decoder, embedding_model, weights):
 
         if src_key in weights:
             if decoder_sd[key].shape == weights[src_key].shape:
-                decoder_sd[key] = weights[src_key].float()
+                w = weights[src_key].float()
+                # HF stores certain RMSNorm weights as (value - 1), add 1 back.
+                # DeltaNet linear_attn.norm.weight and final norm.weight do NOT need +1.
+                norm_suffixes = (".input_layernorm.weight",
+                                 ".post_attention_layernorm.weight",
+                                 ".q_norm.weight", ".k_norm.weight")
+                if w.ndim == 1 and any(key.endswith(s) for s in norm_suffixes):
+                    w = w + 1.0
+                decoder_sd[key] = w
                 loaded += 1
             else:
                 print(f"  Shape mismatch: {key} "
