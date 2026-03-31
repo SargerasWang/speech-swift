@@ -76,7 +76,12 @@ struct PromptBuilder {
         // [3:7] Control: tts_pad + CodeEmbedder(think tokens)
         for ctok in [2154, 2156, langId, 2157] {
             let ce = ensureNCHW(try codeEmbedder.embed(ctok), channels: 1024)
-            prefill.append(addMLMultiArrays(ttsPadEmbed, ce))
+            let combined = addMLMultiArrays(ttsPadEmbed, ce)
+            let cp = combined.dataPointer.assumingMemoryBound(to: Float16.self)
+            let hasNaN = (0..<1024).contains { cp[$0].isNaN }
+            let hasInf = (0..<1024).contains { cp[$0].isInfinite }
+            let maxAbs = (0..<1024).map { abs(Float(cp[$0])) }.max() ?? 0
+            prefill.append(combined)
         }
 
         // [7] Speaker embedding: tts_pad + speaker_embed

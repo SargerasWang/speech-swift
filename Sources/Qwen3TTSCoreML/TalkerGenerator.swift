@@ -45,7 +45,6 @@ final class TalkerGenerator {
     // MARK: - Cache Management
 
     func resetCache() {
-        let kvSize = totalKVDim * maxSeqLen
         keyCache = makeZeroArray(shape: [1, totalKVDim, 1, maxSeqLen])
         valueCache = makeZeroArray(shape: [1, totalKVDim, 1, maxSeqLen])
         currentPos = 0
@@ -113,8 +112,14 @@ final class TalkerGenerator {
         let hiddenArray = result.featureValue(for: "hidden_states")!.multiArrayValue!  // [1, 1024, 1, 1]
 
         // Update KV cache — model returns full updated cache
-        keyCache = result.featureValue(for: "new_key_cache")!.multiArrayValue!
-        valueCache = result.featureValue(for: "new_value_cache")!.multiArrayValue!
+        // Must make contiguous copy if strided (CoreML SIMD alignment)
+        let newKC = result.featureValue(for: "new_key_cache")!.multiArrayValue!
+        let newVC = result.featureValue(for: "new_value_cache")!.multiArrayValue!
+        // Always make contiguous copy — CoreML outputs may have SIMD-aligned strides
+        keyCache = makeContiguousCopy(newKC)
+        valueCache = makeContiguousCopy(newVC)
+        if currentPos == 1 {
+        }
 
         currentPos += 1
 
@@ -218,6 +223,58 @@ final class TalkerGenerator {
             result[i] = Float16(array[idx].floatValue)
         }
         return result
+    }
+
+    /// Make a contiguous copy of a potentially strided MLMultiArray using subscript.
+    private func makeContiguousCopy(_ src: MLMultiArray) -> MLMultiArray {
+        let shape = src.shape
+        let dst = try! MLMultiArray(shape: shape, dataType: src.dataType)
+        let total = shape.map { $0.intValue }.reduce(1, *)
+        // For large arrays, use memcpy if already contiguous
+        let firstStride = src.strides[0].intValue
+        let expectedStride = shape.dropFirst().map { $0.intValue }.reduce(1, *)
+        if firstStride == expectedStride {
+            // Contiguous — fast copy
+            let bytes = total * (src.dataType == .float16 ? 2 : 4)
+            memcpy(dst.dataPointer, src.dataPointer, bytes)
+        } else {
+            // Strided — element-wise copy (slow but correct)
+            // For KV cache [1, 28672, 1, 256], iterate all elements
+            let srcPtr = src.dataPointer
+            let dstPtr = dst.dataPointer
+            let elemSize = src.dataType == .float16 ? 2 : 4
+            let strides = src.strides.map { $0.intValue }
+            let dims = shape.map { $0.intValue }
+
+            // Fast path for 4D [1, C, 1, S] with stride on dim 1
+            if dims.count == 4 && dims[0] == 1 && dims[2] == 1 {
+                let C = dims[1], S = dims[3]
+                let stride1 = strides[1]  // stride for channel dim
+                let stride3 = strides[3]  // stride for seq dim
+                if src.dataType == .float16 {
+                    let sp = srcPtr.assumingMemoryBound(to: Float16.self)
+                    let dp = dstPtr.assumingMemoryBound(to: Float16.self)
+                    for c in 0..<C {
+                        for s in 0..<S {
+                            dp[c * S + s] = sp[c * stride1 + s * stride3]
+                        }
+                    }
+                } else {
+                    let sp = srcPtr.assumingMemoryBound(to: Float.self)
+                    let dp = dstPtr.assumingMemoryBound(to: Float.self)
+                    for c in 0..<C {
+                        for s in 0..<S {
+                            dp[c * S + s] = sp[c * stride1 + s * stride3]
+                        }
+                    }
+                }
+            } else {
+                // General fallback — copy via memcpy (assumes contiguous for now)
+                let bytes = total * elemSize
+                memcpy(dstPtr, srcPtr, bytes)
+            }
+        }
+        return dst
     }
 
     private func makeZeroArray(shape: [Int]) -> MLMultiArray {

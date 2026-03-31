@@ -154,13 +154,21 @@ public final class Qwen3TTSCoreMLModel {
         // Prefill: run all positions through CodeDecoder
         var lastLogits = [Float]()
         var lastHidden = try MLMultiArray(shape: [1, 1024, 1, 1], dataType: .float16)
-        for embed in prefillEmbeds {
+        for (idx, embed) in prefillEmbeds.enumerated() {
             (lastLogits, _) = try codeDecoder.forward(embedArray: embed)
+            let hasNaN = lastLogits.contains { $0.isNaN }
+            if idx < 3 || hasNaN {
+            }
         }
         lastHidden = codeDecoder.lastHiddenState!
 
         // Sample first CB0 (suppress EOS for min_new_tokens=2)
-        lastLogits[codecEos] = -1e9  // suppress EOS
+        // Debug: check greedy first token
+        var greedy = lastLogits; greedy[codecEos] = -1e9
+        for i in 2048..<codecVocabSize { if i != codecEos { greedy[i] = -1e9 } }
+        let greedyTop = greedy.enumerated().sorted { $0.element > $1.element }.prefix(3)
+
+        lastLogits[codecEos] = -1e9
         var nextToken = TTSSampler.sample(
             logits: lastLogits, temperature: temperature, topK: topK,
             suppressRange: (2048, 3072), eosTokenId: codecEos)

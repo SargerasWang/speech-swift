@@ -76,12 +76,18 @@ func addMLMultiArrays(_ a: MLMultiArray, _ b: MLMultiArray) -> MLMultiArray {
     let channels = a.shape[1].intValue  // [1, C, 1, 1]
     let result = try! MLMultiArray(shape: [1, NSNumber(value: channels), 1, 1], dataType: .float16)
     let rp = result.dataPointer.assumingMemoryBound(to: Float16.self)
-    let ap = a.dataPointer.assumingMemoryBound(to: Float16.self)
-    let bp = b.dataPointer.assumingMemoryBound(to: Float16.self)
 
-    // After ensureNCHW, both should be contiguous [1, C, 1, 1] with stride [C, 1, 1, 1]
+    // Read each input respecting its data type
+    func read(_ arr: MLMultiArray, _ i: Int) -> Float {
+        if arr.dataType == .float32 {
+            return arr.dataPointer.assumingMemoryBound(to: Float.self)[i]
+        } else {
+            return Float(arr.dataPointer.assumingMemoryBound(to: Float16.self)[i])
+        }
+    }
+
     for i in 0..<channels {
-        rp[i] = Float16(Float(ap[i]) + Float(bp[i]))
+        rp[i] = Float16(read(a, i) + read(b, i))
     }
     return result
 }
