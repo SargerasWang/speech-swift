@@ -43,6 +43,7 @@ final class MultiCodeDecoderCoreML {
 
         // Sample CB1 from lm_head[0]
         let cb1Logits = extractGroupLogits(logits, group: 0)
+        let greedyCB1 = cb1Logits.enumerated().max(by: { $0.element < $1.element })!
         var prevToken = TTSSampler.sample(logits: cb1Logits, temperature: temperature, topK: topK)
         var tokens = [prevToken]
 
@@ -114,5 +115,8 @@ final class MultiCodeDecoderCoreML {
         memset(a.dataPointer, 0, shape.reduce(1, *) * 2)
         return a
     }
+
+    /// Fast contiguous copy for 4D FP16 [1, C, 1, S] arrays with non-unit strides.
+
 }
 #endif

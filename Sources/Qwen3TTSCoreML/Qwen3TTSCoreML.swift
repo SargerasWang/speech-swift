@@ -189,18 +189,44 @@ public final class Qwen3TTSCoreMLModel {
         // Autoregressive decode loop
         for step in 1..<maxTokens {
             // Step input = sum(all 16 codec embeddings) + tts_pad
-            var codecSum = ensureNCHW(try codeEmbedder.embed(Int(nextToken)), channels: hiddenSize)
+            // Accumulate in FP32 to match Python's numpy precision, cast to FP16 at the end
+            var sum32 = [Float](repeating: 0, count: hiddenSize)
+
+            // Add CB0 embedding
+            let cb0Emb = ensureNCHW(try codeEmbedder.embed(Int(nextToken)), channels: hiddenSize)
+            let cb0Ptr = cb0Emb.dataPointer.assumingMemoryBound(to: Float16.self)
+            for i in 0..<hiddenSize { sum32[i] += Float(cb0Ptr[i]) }
+
+            // Add CB1-15 embeddings
             for (cbIdx, token) in cpTokens.enumerated() {
-                let mceEmbed = ensureNCHW(
+                let mceEmb = ensureNCHW(
                     try multiCodeEmbedder.embed(codebookIdx: cbIdx, tokenId: Int(token)),
                     channels: hiddenSize)
-                codecSum = addMLMultiArrays(codecSum, mceEmbed)
+                let ptr = mceEmb.dataPointer.assumingMemoryBound(to: Float16.self)
+                for i in 0..<hiddenSize { sum32[i] += Float(ptr[i]) }
             }
-            let stepInput = addMLMultiArrays(codecSum, ttsPadEmbed)
+
+            // Add tts_pad (FP32 from npy)
+            if ttsPadEmbed.dataType == .float32 {
+                let padPtr = ttsPadEmbed.dataPointer.assumingMemoryBound(to: Float.self)
+                for i in 0..<hiddenSize { sum32[i] += padPtr[i] }
+            } else {
+                let padPtr = ttsPadEmbed.dataPointer.assumingMemoryBound(to: Float16.self)
+                for i in 0..<hiddenSize { sum32[i] += Float(padPtr[i]) }
+            }
+
+            // Cast to FP16 for model input
+            let stepInput = try MLMultiArray(shape: [1, NSNumber(value: hiddenSize), 1, 1], dataType: .float16)
+            let outPtr = stepInput.dataPointer.assumingMemoryBound(to: Float16.self)
+            for i in 0..<hiddenSize { outPtr[i] = Float16(sum32[i]) }
 
             // CodeDecoder forward
             (lastLogits, _) = try codeDecoder.forward(embedArray: stepInput)
             lastHidden = codeDecoder.lastHiddenState!
+
+            if step <= 5 {
+                let eosL = lastLogits[codecEos]
+            }
 
             // Sample CB0
             let eosLogit = lastLogits[codecEos]
