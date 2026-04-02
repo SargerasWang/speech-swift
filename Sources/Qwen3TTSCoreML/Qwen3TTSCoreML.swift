@@ -60,7 +60,7 @@ public final class Qwen3TTSCoreMLModel {
 
         // With MLState, KV cache stays on ANE — use all compute units
         let defaultConfig = MLModelConfiguration()
-        defaultConfig.computeUnits = computeUnits
+        defaultConfig.computeUnits = .cpuAndGPU
 
         let model = Qwen3TTSCoreMLModel()
 
@@ -147,9 +147,10 @@ public final class Qwen3TTSCoreMLModel {
             ttsPadEmbed: ttsPadEmbed, ttsBosEmbed: ttsBosEmbed,
             ttsEosEmbed: ttsEosEmbed, speakerEmbedding: speakerEmbedding)
 
-        // TTSKit-style: cap max tokens at 8× prefill length
+        // Cap decode tokens: min(requested, 8× prefill, remaining KV cache slots)
         let maxStepsByPrefill = 8 * prefillEmbeds.count
-        let effectiveMaxTokens = min(maxTokens, maxStepsByPrefill)
+        let cacheSlots = 256 - prefillEmbeds.count
+        let effectiveMaxTokens = min(maxTokens, min(maxStepsByPrefill, cacheSlots))
 
         // Reset CodeDecoder KV cache
         codeDecoder.resetCache()

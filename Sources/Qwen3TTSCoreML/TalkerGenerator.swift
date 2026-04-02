@@ -2,19 +2,23 @@
 import CoreML
 import Foundation
 
-/// CoreML CodeDecoder with MLState stateful KV cache.
+/// CoreML CodeDecoder with scatter-write KV cache.
 ///
-/// The KV cache persists on ANE between calls via MLState, avoiding
-/// cross-device copies that cause precision drift. Falls back to
-/// stateless I/O for non-stateful models.
+/// Supports both stateful (MLState) and stateless (explicit I/O)
+/// KV cache management. Falls back to stateless automatically.
 final class TalkerGenerator {
 
     private let model: MLModel
     private let maxSeqLen: Int
     private let hiddenSize: Int
     private let isStateful: Bool
+    private let kvDim: Int
 
+    /// MLState for stateful models.
     private var state: MLState?
+    /// Explicit KV cache for stateless models.
+    private var keyCache: MLMultiArray?
+    private var valueCache: MLMultiArray?
     private var currentPos: Int = 0
 
     /// Last hidden state from the most recent forward pass.
@@ -25,11 +29,26 @@ final class TalkerGenerator {
         self.maxSeqLen = maxSeqLen
         self.hiddenSize = hiddenSize
         self.isStateful = !model.modelDescription.stateDescriptionsByName.isEmpty
+
+        // Detect KV dim from model input spec
+        if let kcDesc = model.modelDescription.inputDescriptionsByName["key_cache"],
+           let constraint = kcDesc.multiArrayConstraint {
+            self.kvDim = constraint.shape[1].intValue
+        } else {
+            // Default: 28 layers * 8 heads * 128 dim = 28672
+            self.kvDim = 28672
+        }
     }
 
     func resetCache() {
         if isStateful {
             state = model.makeState()
+        } else {
+            let shape = [1, NSNumber(value: kvDim), 1, NSNumber(value: maxSeqLen)] as [NSNumber]
+            keyCache = try! MLMultiArray(shape: shape, dataType: .float16)
+            memset(keyCache!.dataPointer, 0, kvDim * maxSeqLen * 2)
+            valueCache = try! MLMultiArray(shape: shape, dataType: .float16)
+            memset(valueCache!.dataPointer, 0, kvDim * maxSeqLen * 2)
         }
         currentPos = 0
     }
@@ -62,12 +81,18 @@ final class TalkerGenerator {
         memset(updateMask.dataPointer, 0, maxSeqLen * 2)
         updateMask.dataPointer.assumingMemoryBound(to: Float16.self)[currentPos] = Float16(1.0)
 
-        let inputs: [String: MLFeatureValue] = [
+        var inputs: [String: MLFeatureValue] = [
             "input_embeds": MLFeatureValue(multiArray: inputEmbeds),
             "cache_length": MLFeatureValue(multiArray: cacheLength),
             "key_padding_mask": MLFeatureValue(multiArray: keyPaddingMask),
             "kv_cache_update_mask": MLFeatureValue(multiArray: updateMask),
         ]
+
+        // Add explicit KV cache for stateless models
+        if !isStateful, let kc = keyCache, let vc = valueCache {
+            inputs["key_cache"] = MLFeatureValue(multiArray: kc)
+            inputs["value_cache"] = MLFeatureValue(multiArray: vc)
+        }
 
         let provider = try MLDictionaryFeatureProvider(dictionary: inputs)
         let result: MLFeatureProvider
@@ -80,6 +105,16 @@ final class TalkerGenerator {
 
         let logitsArray = result.featureValue(for: "logits")!.multiArrayValue!
         let hiddenArray = result.featureValue(for: "hidden_states")!.multiArrayValue!
+
+        // Update explicit KV cache from outputs
+        if !isStateful {
+            if let newKC = result.featureValue(for: "new_key_cache")?.multiArrayValue {
+                keyCache = newKC
+            }
+            if let newVC = result.featureValue(for: "new_value_cache")?.multiArrayValue {
+                valueCache = newVC
+            }
+        }
 
         currentPos += 1
         lastHiddenState = ensureNCHW(hiddenArray, channels: hiddenSize)

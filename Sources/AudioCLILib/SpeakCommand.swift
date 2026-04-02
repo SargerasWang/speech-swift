@@ -356,11 +356,13 @@ public struct SpeakCommand: ParsableCommand {
             print()
 
             let lang = self.language ?? "english"
+            // CoreML backend needs higher temperature (0.8) — low temp is degenerate
+            let coremlTemp: Float = self.temperature == 0.3 ? 0.8 : self.temperature
             print("Synthesizing with CoreML engine (language: \(lang))...")
             let start = CFAbsoluteTimeGetCurrent()
             let audio = try model.synthesize(
                 text: text, language: lang,
-                temperature: self.temperature, topK: Int(self.topK),
+                temperature: coremlTemp, topK: Int(self.topK),
                 maxTokens: self.maxTokens)
             let elapsed = CFAbsoluteTimeGetCurrent() - start
             let duration = Double(audio.count) / 24000.0

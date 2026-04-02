@@ -128,8 +128,8 @@ final class E2EQwen3TTSCoreMLTests: XCTestCase {
             throw XCTSkip("ASR model not available: \(error)")
         }
 
-        let text = "Hello world"
-        let audio = try ttsModel.synthesize(text: text, language: "english", maxTokens: 100)
+        let text = "The quick brown fox jumps over the lazy dog"
+        let audio = try ttsModel.synthesize(text: text, language: "english", maxTokens: 125)
         XCTAssertGreaterThan(audio.count, 0, "Should produce audio")
 
         let duration = Double(audio.count) / 24000.0
@@ -139,13 +139,13 @@ final class E2EQwen3TTSCoreMLTests: XCTestCase {
         print("Input:  \"\(text)\"")
         print("Output: \"\(transcription)\"")
 
-        // Check that ASR recognizes at least one keyword
-        let keywords = ["hello", "world"]
+        // Check that ASR recognizes at least 3 keywords
+        let keywords = ["quick", "brown", "fox", "jumps", "lazy", "dog"]
         let matched = keywords.filter { transcription.lowercased().contains($0) }
         print("Matched \(matched.count)/\(keywords.count) keywords: \(matched)")
 
-        XCTAssertGreaterThanOrEqual(matched.count, 1,
-            "ASR should recognize at least 1 keyword from CoreML TTS output. Got: \"\(transcription)\"")
+        XCTAssertGreaterThanOrEqual(matched.count, 3,
+            "ASR should recognize at least 3 keywords from CoreML TTS output. Got: \"\(transcription)\"")
     }
 }
 #endif

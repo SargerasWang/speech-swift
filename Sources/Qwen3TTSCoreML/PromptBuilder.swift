@@ -51,37 +51,13 @@ struct PromptBuilder {
 
         // [0:3] Role: TextProjector only
         for tid in roleIds {
-            let e = ensureNCHW(try textProjector.embed(tid), channels: 1024)
-            if tid == roleIds[0] {
-                let p: [Float]
-                if e.dataType == .float16 {
-                    p = (0..<5).map { Float(e.dataPointer.assumingMemoryBound(to: Float16.self)[$0]) }
-                } else {
-                    p = (0..<5).map { e.dataPointer.assumingMemoryBound(to: Float.self)[$0] }
-                }
-                // Check raw model output before ensureNCHW
-                let raw = try textProjector.embed(tid)
-                let rawShape = raw.shape.map { $0.intValue }
-                let rawStrides = raw.strides.map { $0.intValue }
-                let rawCount = rawShape.reduce(1, *)
-                var rawVals = [Float]()
-                if raw.dataType == .float16 {
-                    let rp = raw.dataPointer.assumingMemoryBound(to: Float16.self)
-                    for i in 0..<min(5, rawCount) { rawVals.append(Float(rp[i])) }
-                }
-            }
-            prefill.append(e)
+            prefill.append(ensureNCHW(try textProjector.embed(tid), channels: 1024))
         }
 
         // [3:7] Control: tts_pad + CodeEmbedder(think tokens)
         for ctok in [2154, 2156, langId, 2157] {
             let ce = ensureNCHW(try codeEmbedder.embed(ctok), channels: 1024)
-            let combined = addMLMultiArrays(ttsPadEmbed, ce)
-            let cp = combined.dataPointer.assumingMemoryBound(to: Float16.self)
-            let hasNaN = (0..<1024).contains { cp[$0].isNaN }
-            let hasInf = (0..<1024).contains { cp[$0].isInfinite }
-            let maxAbs = (0..<1024).map { abs(Float(cp[$0])) }.max() ?? 0
-            prefill.append(combined)
+            prefill.append(addMLMultiArrays(ttsPadEmbed, ce))
         }
 
         // [7] Speaker embedding: tts_pad + speaker_embed
