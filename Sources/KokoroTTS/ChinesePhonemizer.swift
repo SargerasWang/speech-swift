@@ -26,22 +26,28 @@ final class ChinesePhonemizer {
 
     /// Mandarin finals mapped to IPA (tone placeholder "0" replaced later).
     /// Ordered longest-first to ensure correct greedy matching.
+    ///
+    /// Note: combining diacritics (◌̯ non-syllabic, ◌̩ syllabic) are omitted because
+    /// Kokoro's vocab_index.json doesn't contain them — they'd be silently dropped
+    /// during tokenization, corrupting the phoneme sequence.
     private static let finals: [(pinyin: String, ipa: String)] = [
         ("iang", "ja0ŋ"), ("iong", "jʊ0ŋ"), ("uang", "wa0ŋ"), ("ueng", "wə0ŋ"),
-        ("iao", "jau̯0"), ("ian", "jɛ0n"), ("iou", "jou̯0"),
-        ("uai", "wai̯0"), ("uan", "wa0n"), ("uei", "wei̯0"), ("uen", "wə0n"),
+        ("iao", "jau0"), ("ian", "jɛ0n"), ("iou", "jou0"),
+        ("uai", "wai0"), ("uan", "wa0n"), ("uei", "wei0"), ("uen", "wə0n"),
         ("üan", "ɥɛ0n"), ("üe", "ɥe0"),
         ("ang", "a0ŋ"), ("eng", "ə0ŋ"), ("ing", "i0ŋ"), ("ong", "ʊ0ŋ"),
-        ("ai", "ai̯0"), ("ei", "ei̯0"), ("ao", "au̯0"), ("ou", "ou̯0"),
+        ("ai", "ai0"), ("ei", "ei0"), ("ao", "au0"), ("ou", "ou0"),
         ("an", "a0n"), ("en", "ə0n"), ("in", "i0n"), ("ün", "y0n"),
         ("ia", "ja0"), ("ie", "je0"), ("uo", "wo0"), ("ua", "wa0"),
         ("a", "a0"), ("e", "ɤ0"), ("i", "i0"), ("o", "wo0"), ("u", "u0"), ("ü", "y0"),
     ]
 
-    /// Context-dependent final for "i" after zh/ch/sh/r → retroflex continuant.
-    private static let retroflexI = "ɻ̩0"
-    /// Context-dependent final for "i" after z/c/s → alveolar continuant.
-    private static let alveolarI = "ɹ̩0"
+    /// Context-dependent final for "i" after zh/ch/sh/r.
+    /// Uses ɨ (close central unrounded) which is in Kokoro's vocab,
+    /// instead of ɻ̩ (combining syllabic mark not in vocab).
+    private static let retroflexI = "ɨ0"
+    /// Context-dependent final for "i" after z/c/s.
+    private static let alveolarI = "ɨ0"
 
     // MARK: - Interjections & Syllabic Consonants
 
