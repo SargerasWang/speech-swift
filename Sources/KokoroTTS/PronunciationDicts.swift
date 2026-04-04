@@ -137,7 +137,7 @@ enum PronunciationDicts {
         "verde": "vˈeɾədɨ", "vermelho": "vˌeɾəmˈeʎʊ", "vida": "vˈidɐ",
         "vinho": "vˈiɲʊ", "você": "vosˈe", "água": "ˈaɡwɐ",
         // Additional common words
-        "é": "ˈɛ", "boa": "bˈoɐ", "dia": "dˈiɐ", "tarde": "tˈaɾədɨ",
+        "é": "ˈɛ", "boa": "bˈoɐ", "tarde": "tˈaɾədɨ",
         "noite": "nˈoɪtɨ", "nome": "nˈomɨ", "tudo": "tˈudʊ", "nada": "nˈadɐ",
         "hoje": "ˈoʒɨ", "amanhã": "ɐmɐ̃ɲˈɐ̃", "ontem": "ˈoŋteɪŋ",
         "senhor": "sɨɲˈoɹ", "senhora": "sˌeɲˈoɾɐ", "favor": "fɐvˈoɹ",
