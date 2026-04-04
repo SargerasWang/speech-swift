@@ -7,7 +7,7 @@ import Foundation
 final class LatinPhonemizer {
 
     enum Language {
-        case french, spanish, portuguese, italian, german
+        case french, spanish, portuguese, italian
     }
 
     private let language: Language
@@ -84,7 +84,6 @@ final class LatinPhonemizer {
         case .spanish: ipa = spanishToIPA(word)
         case .portuguese: ipa = portugueseToIPA(word)
         case .italian: ipa = italianToIPA(word)
-        case .german: ipa = germanToIPA(word)
         }
 
         // Apply E2M mappings to match Kokoro's training format.
@@ -372,50 +371,4 @@ final class LatinPhonemizer {
         return result
     }
 
-    // MARK: - German G2P
-
-    private static let germanRules: [(pattern: String, ipa: String)] = [
-        // Trigraphs
-        ("sch", "ʃ"), ("tch", "tʃ"),
-        // Digraphs
-        ("ch", "x"), ("ck", "k"), ("ph", "f"), ("th", "t"),
-        ("sp", "ʃp"), ("st", "ʃt"),
-        ("ei", "ai"), ("eu", "ɔi"), ("äu", "ɔi"), ("au", "au"),
-        ("ie", "iː"), ("ee", "eː"), ("oo", "oː"),
-        ("pf", "pf"), ("qu", "kv"), ("ng", "ŋ"), ("nk", "ŋk"),
-        ("tz", "ts"), ("dt", "t"), ("ss", "s"),
-        // Accented / umlauts
-        ("ä", "ɛ"), ("ö", "ø"), ("ü", "y"), ("ß", "s"),
-        // Basic
-        ("a", "a"), ("b", "b"), ("c", "k"), ("d", "d"), ("e", "e"),
-        ("f", "f"), ("g", "ɡ"), ("h", "h"), ("i", "i"), ("j", "j"),
-        ("k", "k"), ("l", "l"), ("m", "m"), ("n", "n"), ("o", "o"),
-        ("p", "p"), ("r", "ʁ"), ("s", "z"), ("t", "t"), ("u", "u"),
-        ("v", "f"), ("w", "v"), ("x", "ks"), ("y", "y"), ("z", "ts"),
-    ]
-
-    private func germanToIPA(_ word: String) -> String {
-        var result = ""
-        let chars = Array(word)
-        var i = 0
-
-        while i < chars.count {
-            var matched = false
-            for len in stride(from: min(3, chars.count - i), through: 1, by: -1) {
-                let substr = String(chars[i..<i+len])
-                if let rule = Self.germanRules.first(where: { $0.pattern == substr }) {
-                    result += rule.ipa
-                    i += len
-                    matched = true
-                    break
-                }
-            }
-            if !matched {
-                result += String(chars[i])
-                i += 1
-            }
-        }
-
-        return result
-    }
 }

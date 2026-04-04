@@ -2,57 +2,36 @@ import Foundation
 
 /// Pronunciation dictionaries for Kokoro TTS multilingual support.
 ///
-/// IPA transcriptions generated to match the format Kokoro was trained on.
-/// Dictionary lookup is the primary phonemization method for these languages;
-/// rule-based G2P in LatinPhonemizer/HindiPhonemizer serves as fallback for
-/// out-of-vocabulary words.
+/// Large dictionaries (French, Portuguese, Hindi) are loaded from JSON resource
+/// files at runtime. Smaller ones (Spanish, Italian, German, Korean) are
+/// embedded as Swift literals. Source: ipa-dict (MIT, open-dict-data/ipa-dict)
+/// and standard phonetic references.
 enum PronunciationDicts {
 
-    // MARK: - French (163 entries)
+    // MARK: - JSON Resource Loading
 
-    static let fr: [String: String] = [
-        "aimer": "ɛmˈe", "aller": "alˈe", "ami": "amˈi", "an": "ˈɑ̃",
-        "année": "anˈe", "assez": "asˈe", "aussi": "osˈi", "autre": "ˈotʁ",
-        "autres": "ˈotʁ", "avec": "avˈɛk", "avoir": "avwˈaʁ", "beau": "bˈo",
-        "beaucoup": "bokˈu", "belle": "bˈɛl", "bien": "bjˈɛ̃", "blanc": "blˈɑ̃",
-        "bleu": "blˈø", "boire": "bwˈaʁ", "bon": "bˈɔ̃", "bonjour": "bɔ̃ʒˈuʁ",
-        "bonne": "bˈɔn", "bonsoir": "bɔ̃swˈaʁ", "bouche": "bˈuʃ", "bras": "bʁˈa",
-        "café": "kafˈe", "car": "kˈaʁ", "ce": "sˈə", "ceci": "səsˈi",
-        "cette": "sˈɛt", "chose": "ʃˈɔz", "coeur": "kˈœʁ", "combien": "kɔ̃bjˈɛ̃",
-        "comment": "kɔmˈɑ̃", "croire": "kʁwˈaʁ", "dans": "dˈɑ̃", "de": "dˈə",
-        "des": "dˈe", "dire": "dˈiʁ", "donc": "dˈɔ̃k", "donner": "dɔnˈe",
-        "dormir": "dɔʁmˈiʁ", "du": "dˈy", "eau": "ˈo", "elle": "ˈɛl",
-        "elles": "ˈɛl", "en": "ˈɑ̃", "encore": "ɑ̃kˈɔʁ", "enfant": "ɑ̃fˈɑ̃",
-        "est": "ˈɛ", "et": "ˈe", "faire": "fˈɛʁ", "fait": "fˈɛ",
-        "famille": "famˈij", "femme": "fˈam", "fille": "fˈij", "fils": "fˈil",
-        "frère": "fʁˈɛʁ", "grand": "ɡʁˈɑ̃", "grande": "ɡʁˈɑ̃d", "homme": "ˈɔm",
-        "ici": "isˈi", "il": "ˈil", "ils": "ˈil", "jamais": "ʒamˈɛ",
-        "jaune": "ʒˈon", "je": "ʒˈə", "jeune": "ʒˈøn", "jour": "ʒˈuʁ",
-        "la": "lˈa", "lait": "lˈɛ", "le": "lˈə", "les": "lˈe",
-        "leur": "lˈœʁ", "là": "lˈa", "ma": "mˈa", "main": "mˈɛ̃",
-        "mais": "mˈɛ", "maison": "mɛzˈɔ̃", "manger": "mɑ̃ʒˈe", "merci": "mɛʁsˈi",
-        "mes": "mˈe", "mettre": "mˈɛtʁ", "mon": "mˈɔ̃", "monde": "mˈɔ̃d",
-        "mère": "mˈɛʁ", "même": "mˈɛm", "ne": "nˈə", "ni": "nˈi",
-        "noir": "nwˈaʁ", "non": "nˈɔ̃", "notre": "nˈotʁ", "nous": "nˈu",
-        "nouveau": "nuvˈo", "nouvelle": "nuvˈɛl", "on": "ˈɔ̃", "or": "ˈɔʁ",
-        "ou": "ˈu", "oui": "wˈi", "où": "ˈu", "pain": "pˈɛ̃",
-        "par": "pˈaʁ", "pardon": "paʁdˈɔ̃", "parler": "paʁlˈe", "pas": "pˈa",
-        "pays": "pɛˈi", "penser": "pɑ̃sˈe", "petit": "pətˈi", "petite": "pətˈit",
-        "peu": "pˈø", "pied": "pjˈe", "plus": "plˈy", "pour": "pˈuʁ",
-        "pourquoi": "puʁkwˈa", "pouvoir": "puvwˈaʁ", "prendre": "pʁˈɑ̃dʁ",
-        "père": "pˈɛʁ", "quand": "kˈɑ̃", "que": "kˈə", "quel": "kˈɛl",
-        "quelle": "kˈɛl", "quelque": "kˈɛlkə", "qui": "kˈi", "rester": "ʁɛstˈe",
-        "rouge": "ʁˈuʒ", "rue": "ʁˈy", "sa": "sˈa", "salut": "salˈy",
-        "savoir": "savwˈaʁ", "se": "sˈə", "ses": "sˈe", "si": "sˈi",
-        "son": "sˈɔ̃", "sont": "sˈɔ̃", "sur": "sˈyʁ", "ta": "tˈa",
-        "temps": "tˈɑ̃", "tes": "tˈe", "test": "tˈɛst", "ton": "tˈɔ̃",
-        "tous": "tˈus", "tout": "tˈu", "toute": "tˈut", "toutes": "tˈut",
-        "travail": "tʁavˈaj", "trop": "tʁˈo", "trouver": "tʁuvˈe", "très": "tʁˈɛ",
-        "tu": "tˈy", "tête": "tˈɛt", "un": "ˈœ̃", "une": "ˈyn",
-        "venir": "vənˈiʁ", "vert": "vˈɛʁ", "vie": "vˈi", "ville": "vˈil",
-        "vin": "vˈɛ̃", "voir": "vwˈaʁ", "votre": "vˈotʁ", "vouloir": "vulwˈaʁ",
-        "vous": "vˈu", "yeux": "jˈø", "école": "ekˈɔl", "être": "ˈɛtʁ",
-    ]
+    private static func loadJSON(_ name: String) -> [String: String] {
+        let url = Bundle.module.url(forResource: name, withExtension: "json")
+                  ?? Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Resources")
+        guard let url else { return [:] }
+        guard let data = try? Data(contentsOf: url),
+              let dict = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return dict
+    }
+
+    // MARK: - French (3093 entries, JSON)
+
+    static let fr: [String: String] = loadJSON("dict_fr")
+
+    // MARK: - Portuguese (2001 entries, JSON)
+
+    static let pt: [String: String] = loadJSON("dict_pt")
+
+    // MARK: - Hindi (146 entries, JSON)
+
+    static let hi: [String: String] = loadJSON("dict_hi")
 
     // MARK: - Spanish (125 entries)
 
@@ -92,62 +71,61 @@ enum PronunciationDicts {
         "viejo": "bjˈexo", "vino": "bˈino", "yo": "ʝˈo", "él": "ˈel",
     ]
 
-    // MARK: - Portuguese (115 entries)
+    // MARK: - Italian (174 entries)
 
-    static let pt: [String: String] = [
-        "a": "ˈa", "adeus": "ɐdˈeʊʃ", "agora": "ˌɐɡˈɔɾɐ", "alto": "ˈɑltʊ",
-        "amarelo": "ɐmɐɾˈɛlʊ", "amigo": "ɐmˈiɡʊ", "ano": "ˈɐ̃nʊ",
-        "antes": "ˈɐ̃ŋtɨʃ", "aqui": "ɐkˈi", "as": "ˈɐʃ", "até": "ɐtˈɛ",
-        "azul": "ɐzˈuw", "baixo": "bˈaɪʃʊ", "bem": "bˈeɪŋ", "boca": "bˈokɐ",
-        "bom": "bˈoŋ", "branco": "bɹˈɐ̃ŋkʊ", "cabeça": "kˌɐbˈesɐ",
-        "café": "kɐfˈɛ", "casa": "kˈazɐ", "chegar": "ʃɨɡˈaɹ",
-        "cidade": "sˌidˈadɨ", "cinco": "sˈiŋkʊ", "com": "kˈom", "como": "kˈomʊ",
-        "coração": "kˌuɾɐsˈɐ̃ʊ̃", "da": "dˈɐ", "dar": "dˈaɹ", "de": "dˈɨ",
-        "depois": "dɨpˈoɪʃ", "desde": "dˈeʒdɨ", "dia": "dˈiɐ", "dizer": "dizˈeɹ",
-        "do": "dˈʊ", "dois": "dˈoɪʃ", "ela": "ˈɛlɐ", "elas": "ˈelɐʃ",
-        "ele": "ˈelɨ", "eles": "ˈelɨʃ", "em": "ˈeɪŋ", "entre": "ˈeɪŋtɹɨ",
-        "estar": "ɨʃtˈɐɹ", "eu": "ˈeʊ", "família": "fɐmˈiljɐ",
-        "fazer": "fɐzˈeɹ", "filha": "fˈiʎɐ", "filho": "fˈiʎʊ",
-        "grande": "ɡɹˈɐ̃ŋdɨ", "homem": "ˈomeɪŋ", "ir": "ˈiɹ",
-        "irmão": "iɾəmˈɐ̃ʊ̃", "isso": "ˈisʊ", "isto": "ˈiʃtʊ",
-        "janela": "ʒɐnˈɛlɐ", "jovem": "ʒˈɔveɪŋ", "leite": "lˈeɪtɨ",
-        "mais": "mˈaɪʃ", "mas": "mˈɐʃ", "mesa": "mˈezɐ", "muito": "mwˈiŋtʊ",
-        "mulher": "muʎˈɛɹ", "mundo": "mˈũŋdʊ", "mãe": "mˈɐ̃j", "mão": "mˈɐ̃ʊ̃",
-        "na": "nˈɐ", "no": "nˈʊ", "novo": "nˈovʊ", "nunca": "nˈũŋkɐ",
-        "não": "nˈɐ̃ʊ̃", "nós": "nˈɔʃ", "o": "ˈɔ", "obrigado": "ˌɔbɹiɡˈadʊ",
-        "olho": "ˈɔʎʊ", "olá": "ɔlˈa", "onde": "ˈoŋdɨ", "os": "ˈʊʃ",
-        "pai": "pˈaɪ", "para": "pˈɐɾɐ", "país": "pɐˈiʃ", "pequeno": "pˌekˈenʊ",
-        "poder": "pudˈeɹ", "por": "pˈuɹ", "porque": "pˈoɾəkɨ",
-        "porta": "pˈɔɾətɐ", "preto": "pɹˈetʊ", "pão": "pˈɐ̃ʊ̃", "pé": "pˈɛ",
-        "quando": "kwˈɐ̃ŋdʊ", "quatro": "kwˈatɹʊ", "que": "kˈɨ",
-        "querer": "kɨɾˈeɹ", "rua": "ʁˈuɐ", "saber": "sɐbˈeɹ", "sem": "sˈeɪŋ",
-        "sempre": "sˈeɪmpɹɨ", "ser": "sˈɨɹ", "sim": "sˈiŋ", "sobre": "sˈobɹɨ",
-        "também": "tɐ̃mbˈeɪŋ", "tempo": "tˈeɪmpʊ", "ter": "tˈɨɹ",
-        "teste": "tˈɛʃtɨ", "todo": "tˈodʊ", "três": "tɹˈeʃ", "tu": "tˈu",
-        "um": "ˈũŋ", "uma": "ˈumɐ", "velho": "vˈɛʎʊ", "ver": "vˈeɹ",
-        "verde": "vˈeɾədɨ", "vermelho": "vˌeɾəmˈeʎʊ", "vida": "vˈidɐ",
-        "vinho": "vˈiɲʊ", "você": "vosˈe", "água": "ˈaɡwɐ",
+    static let it: [String: String] = [
+        "acqua": "ˈakːwa", "alto": "ˈalto", "altro": "ˈaltro", "amico": "amˈiko",
+        "anche": "ˈanke", "andare": "andˈare", "anno": "ˈanno", "avere": "avˈere",
+        "bambina": "bambˈina", "bambino": "bambˈino", "basso": "bˈasso",
+        "bella": "bˈɛlla", "bello": "bˈɛllo", "bene": "bˈɛne", "bere": "bˈere",
+        "bianco": "bjˈanko", "blu": "blˈu", "bocca": "bˈokːa",
+        "braccio": "brˈatʃːo", "brutto": "brˈutːo", "buonasera": "bwˌɔnasˈera",
+        "buongiorno": "bʊondʒˈɔrno", "buono": "bʊˈɔno", "caffè": "kaffˈɛ",
+        "caldo": "kˈaldo", "casa": "kˈaza", "cattivo": "katːˈivo", "che": "kˈe",
+        "chi": "kˈi", "ciao": "tʃˈao", "cibo": "tʃˈibo", "cinque": "tʃˈinkwe",
+        "città": "tʃitːˈa", "come": "kˈome", "cosa": "kˈɔza", "cuore": "kʊˈɔre",
+        "dal": "dˈal", "dalla": "dˈalla", "dare": "dˈare", "debole": "dˈebole",
+        "dei": "dˈeɪ", "del": "dˈel", "della": "dˈella", "delle": "dˈelle",
+        "dello": "dˈello", "di": "dˈi", "dieci": "djˈɛtʃɪ", "dire": "dˈire",
+        "domani": "domˈanɪ", "donna": "dˈɔnna", "dopo": "dˈopo",
+        "dormire": "dormˈire", "dove": "dˈove", "dovere": "dovˈere", "due": "dˈue",
+        "erano": "ˈɛrano", "essere": "ˈɛssere", "famiglia": "famˈiʎa",
+        "fare": "fˈare", "felice": "felˈitʃe", "figlia": "fˈiʎa",
+        "figlio": "fˈiʎo", "finestra": "finˈɛstra", "forte": "fˈɔrte",
+        "fratello": "fratˈɛllo", "freddo": "frˈedːo", "gamba": "ɡˈamba",
+        "giallo": "dʒˈallo", "giorno": "dʒˈorno", "giovane": "dʒˈovane",
+        "gli": "ʎˈɪ", "grande": "ɡrˈande", "grazie": "ɡrˈatsje",
+        "ieri": "jˈɛrɪ", "il": "ˈiːl", "io": "ˈio", "la": "lˈa",
+        "latte": "lˈatːe", "le": "lˈe", "leggere": "lˈɛdʒːere", "lei": "lˈɛi",
+        "lo": "lˈo", "loro": "lˈɔro", "lui": "lˈui", "lungo": "lˈuŋɡo",
+        "ma": "mˈa", "madre": "mˈadre", "mai": "mˈaj", "mangiare": "mandʒˈare",
+        "mano": "mˈano", "mattina": "matːˈina", "migliore": "miʎˈore",
+        "molto": "mˈolto", "mondo": "mˈondo", "nero": "nˈero", "noi": "nˈoi",
+        "non": "nˈon", "notte": "nˈɔtːe", "nove": "nˈɔve", "nuovo": "nʊˈɔvo",
+        "occhio": "ˈɔkːio", "oggi": "ˈɔdʒːɪ", "ogni": "ˈoɲɲɪ", "ora": "ˈora",
+        "otto": "ˈɔtːo", "padre": "pˈadre", "paese": "paˈeze", "pane": "pˈane",
+        "parlare": "parlˈare", "peggiore": "pedʒːˈore", "pensare": "pensˈare",
+        "perché": "perkˈe", "piccolo": "pˈikːolo", "piede": "pjˈɛde",
+        "più": "pjˈu", "porta": "pˈɔrta", "potere": "potˈere", "prego": "prˈɛɡo",
+        "prima": "prˈima", "primo": "prˈimo", "prova": "prˈɔva",
+        "quale": "kwˈale", "quando": "kwˈando", "quanto": "kwˈanto",
+        "quattro": "kwˈatːro", "quello": "kwˈello", "questa": "kwˈesta",
+        "questo": "kwˈesto", "qui": "kwˈi", "rosso": "rˈosso",
+        "sapere": "sapˈere", "scrivere": "skrˈivere", "scusi": "skˈuzɪ",
+        "secondo": "sekˈondo", "sedia": "sˈɛdia", "sei": "sˈɛi",
+        "sempre": "sˈɛmpre", "sentire": "sentˈire", "sera": "sˈera",
+        "sette": "sˈɛtːe", "siamo": "sjˈamo", "siete": "sjˈete",
+        "sole": "sˈole", "sono": "sˈono", "sorella": "sorˈɛlla",
+        "splende": "splˈɛnde", "stare": "stˈare", "stata": "stˈata",
+        "stato": "stˈato", "stesso": "stˈesso", "strada": "strˈada",
+        "sì": "sˈiː", "tavola": "tˈavola", "tempo": "tˈɛmpo",
+        "terzo": "tˈɛrtso", "testa": "tˈɛsta", "tre": "trˈe",
+        "triste": "trˈiste", "tu": "tˈu", "tutto": "tˈutːo",
+        "ultimo": "ˈultimo", "un": "ˈun", "una": "ˈuna", "uno": "ˈuno",
+        "uomo": "wˈɔmo", "vecchio": "vˈɛkːio", "vedere": "vedˈere",
+        "venire": "venˈire", "verde": "vˈerde", "vino": "vˈino",
+        "vita": "vˈita", "voi": "vˈoi", "volere": "volˈere", "è": "ˈɛː",
     ]
 
-    // MARK: - Hindi (60 entries)
 
-    static let hi: [String: String] = [
-        "अगर": "ˈʌɡəɾ", "अच्छा": "ˈʌcʰcʰaː", "आँख": "ˈaːnkʰ",
-        "आना": "ˈaːnaː", "आप": "ˈaːp", "एक": "ˈeːk", "और": "ˈɔːɾ",
-        "करना": "kˈʌɾnˌaː", "कहाँ": "kˈʌhã", "काला": "kˈaːlaː",
-        "कृपया": "kɾˈɪpjˌaː", "कैसे": "kˈɛːseː", "क्या": "kːjˈaː",
-        "खाना": "kʰˈaːnaː", "घर": "ɡʰˈʌɾ", "चाय": "cˈaːj", "चार": "cˈaːɾ",
-        "छोटा": "cʰˈoːʈaː", "जब": "ɟˈʌb", "जाना": "ɟˈaːnaː",
-        "तीन": "tˈiːn", "तुम": "tˈʊm", "तो": "tˈoː", "था": "tʰˈaː",
-        "थे": "tʰˈeː", "दिल": "dˈɪl", "दुनिया": "dˈʊnɪjˌaː",
-        "दूध": "dˈuːdʰ", "देना": "dˈeːnaː", "दो": "dˈoː", "दोस्त": "dˈoːst",
-        "धन्यवाद": "dʰˌənjəʋˈaːd", "नमस्ते": "nəmˈʌsteː", "नया": "nˈʌjaː",
-        "नीला": "nˈiːlaː", "परिवार": "pˌəɾɪʋˈaːɾ", "परीक्षा": "pəɾˈiːkʃaː",
-        "पानी": "pˈaːni", "पिता": "pˈɪtaː", "पीला": "pˈiːlaː", "पैर": "pˈɛːɾ",
-        "बड़ा": "bˈʌɾaː", "बहन": "bˈʌhən", "बेटा": "bˈeːʈaː",
-        "भाई": "bʰˈaːi", "माँ": "mˈã", "मैं": "mˈɛ̃", "यह": "jˈəh",
-        "या": "jˈaː", "लाल": "lˈaːl", "लेकिन": "lˈeːkɪn", "लेना": "lˈeːnaː",
-        "वह": "ʋˈəh", "वे": "ʋˈeː", "सिर": "sˈɪɾ", "हम": "hˈəm",
-        "हरा": "hˈʌɾaː", "हाथ": "hˈaːtʰ", "है": "hˈɛː", "हैं": "hˈɛ̃",
-    ]
 }

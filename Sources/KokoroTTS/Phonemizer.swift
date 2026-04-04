@@ -131,13 +131,11 @@ public final class KokoroPhonemizer {
 
     private lazy var chinesePhonemizer = ChinesePhonemizer()
     private lazy var japanesePhonemizer = JapanesePhonemizer()
-    private lazy var koreanPhonemizer = KoreanPhonemizer()
     private lazy var hindiPhonemizer = HindiPhonemizer()
     private lazy var frenchPhonemizer = LatinPhonemizer(language: .french)
     private lazy var spanishPhonemizer = LatinPhonemizer(language: .spanish)
     private lazy var portuguesePhonemizer = LatinPhonemizer(language: .portuguese)
     private lazy var italianPhonemizer = LatinPhonemizer(language: .italian)
-    private lazy var germanPhonemizer = LatinPhonemizer(language: .german)
 
     // MARK: - Tokenization
 
@@ -150,7 +148,7 @@ public final class KokoroPhonemizer {
         case "ja", "japanese":
             phonemes = japanesePhonemizer.phonemize(text)
         case "it", "italian":
-            phonemes = italianPhonemizer.phonemize(text)
+            phonemes = phonemizeWithDict(text, dict: PronunciationDicts.it, fallback: italianPhonemizer)
         case "fr", "french":
             phonemes = phonemizeWithDict(text, dict: PronunciationDicts.fr, fallback: frenchPhonemizer)
         case "es", "spanish":

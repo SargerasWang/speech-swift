@@ -229,28 +229,6 @@ final class JapanesePhonemeizerTests: XCTestCase {
     }
 }
 
-// MARK: - Korean Phonemizer Tests
-
-final class KoreanPhonemizerTests: XCTestCase {
-
-    func testRomanToIPA() {
-        let ipa = KoreanPhonemizer.romanToIPA("annyeonghaseyo")
-        XCTAssertFalse(ipa.isEmpty)
-        XCTAssertTrue(ipa.contains("a"), "Should contain vowel 'a': \(ipa)")
-    }
-
-    func testKoreanPhonemizerProducesOutput() {
-        let phonemizer = KoreanPhonemizer()
-        let result = phonemizer.phonemize("안녕하세요")
-        XCTAssertFalse(result.isEmpty, "Should produce phonemes for Korean: \(result)")
-    }
-
-    func testKoreanMultipleWords() {
-        let phonemizer = KoreanPhonemizer()
-        let result = phonemizer.phonemize("안녕하세요 세계")
-        XCTAssertGreaterThan(result.count, 5, "Should produce multi-word IPA: \(result)")
-    }
-}
 
 // MARK: - Hindi Phonemizer Tests
 
@@ -353,14 +331,6 @@ final class MultilingualTokenizerTests: XCTestCase {
         XCTAssertEqual(ids.first, 1)
         XCTAssertEqual(ids.last, 2)
         XCTAssertGreaterThan(ids.count, 2, "Should produce tokens for Japanese")
-    }
-
-    func testKoreanRouting() {
-        let phonemizer = KokoroPhonemizer(vocab: makeVocab())
-        let ids = phonemizer.tokenize("안녕하세요", language: "ko")
-        XCTAssertEqual(ids.first, 1)
-        XCTAssertEqual(ids.last, 2)
-        XCTAssertGreaterThan(ids.count, 2, "Should produce tokens for Korean")
     }
 
     func testHindiRouting() {
