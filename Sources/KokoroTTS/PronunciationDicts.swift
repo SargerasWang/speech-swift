@@ -127,12 +127,5 @@ enum PronunciationDicts {
         "vita": "vˈita", "voi": "vˈoi", "volere": "volˈere", "è": "ˈɛː",
     ]
 
-    // MARK: - German (235 entries, JSON)
-
-    static let de: [String: String] = loadJSON("dict_de")
-
-    // MARK: - Korean (152 entries, JSON)
-
-    static let ko: [String: String] = loadJSON("dict_ko")
 
 }

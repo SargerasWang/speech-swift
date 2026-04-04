@@ -171,12 +171,12 @@ Sources/KokoroTTS/
   Configuration.swift        Model config, voice/language selection
   KokoroModel.swift          End-to-end CoreML model loading and inference
   KokoroTTS.swift            High-level API (fromPretrained, synthesize, alignment)
-  Phonemizer.swift           English G2P + multilingual routing (en/zh/ja/ko/hi/fr/es/pt)
+  Phonemizer.swift           English G2P + multilingual routing (en/zh/ja/hi/fr/es/pt/it)
   ChinesePhonemizer.swift    Chinese: CFStringTransform pinyin → IPA
   JapanesePhonemizer.swift   Japanese: CFStringTokenizer → katakana → IPA (M2P table)
-  KoreanPhonemizer.swift     Korean: Apple transliteration → IPA
   HindiPhonemizer.swift      Hindi: Apple IAST transliteration → IPA
-  LatinPhonemizer.swift      French/Spanish/Portuguese: rule-based grapheme → IPA
+  LatinPhonemizer.swift      French/Spanish/Portuguese/Italian: rule-based grapheme → IPA
+  PronunciationDicts.swift   Pronunciation dictionaries (JSON resource loading + inline)
   KokoroTTS+Protocols.swift  Protocol conformance
   KokoroTTS+Memory.swift     Memory reporting
 ```
