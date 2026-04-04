@@ -73,37 +73,41 @@ final class LatinPhonemizer {
     // MARK: - Word Conversion
 
     private func convertWord(_ word: String) -> String {
+        let ipa: String
         switch language {
-        case .french: return frenchToIPA(word)
-        case .spanish: return spanishToIPA(word)
-        case .portuguese: return portugueseToIPA(word)
-        case .italian: return italianToIPA(word)
-        case .german: return germanToIPA(word)
+        case .french: ipa = frenchToIPA(word)
+        case .spanish: ipa = spanishToIPA(word)
+        case .portuguese: ipa = portugueseToIPA(word)
+        case .italian: ipa = italianToIPA(word)
+        case .german: ipa = germanToIPA(word)
         }
+        // Add primary stress mark for multi-syllable words.
+        // Kokoro's duration model expects ˈ markers (espeak-ng convention).
+        if ipa.count >= 4 {
+            return "ˈ" + ipa
+        }
+        return ipa
     }
 
     // MARK: - French G2P
 
     /// French grapheme-to-phoneme rules.
+    /// Nasals only before consonants (not before vowels or n/m).
     private static let frenchRules: [(pattern: String, ipa: String)] = [
         // Trigraphs / special combos
-        ("eau", "o"), ("aux", "o"), ("eux", "ø"), ("oeu", "œ"),
+        ("eau", "oː"), ("aux", "oː"), ("eux", "øː"), ("oeu", "œː"),
         ("ain", "ɛ̃"), ("ein", "ɛ̃"), ("oin", "wɛ̃"),
         ("ien", "jɛ̃"), ("ion", "jɔ̃"),
-        // Nasal vowels
-        ("an", "ɑ̃"), ("am", "ɑ̃"), ("en", "ɑ̃"), ("em", "ɑ̃"),
-        ("on", "ɔ̃"), ("om", "ɔ̃"), ("un", "œ̃"), ("um", "œ̃"),
-        ("in", "ɛ̃"), ("im", "ɛ̃"),
         // Digraphs
-        ("ou", "u"), ("oi", "wa"), ("ai", "ɛ"), ("ei", "ɛ"),
-        ("au", "o"), ("eu", "ø"), ("ch", "ʃ"), ("ph", "f"),
+        ("ou", "uː"), ("oi", "waː"), ("ai", "ɛː"), ("ei", "ɛː"),
+        ("au", "oː"), ("eu", "øː"), ("ch", "ʃ"), ("ph", "f"),
         ("th", "t"), ("gn", "ɲ"), ("qu", "k"), ("gu", "ɡ"),
         ("ll", "l"), ("ss", "s"), ("tt", "t"), ("nn", "n"),
         ("mm", "m"), ("pp", "p"), ("rr", "ʁ"), ("ff", "f"),
         // Accented vowels
-        ("é", "e"), ("è", "ɛ"), ("ê", "ɛ"), ("ë", "ɛ"),
-        ("à", "a"), ("â", "ɑ"), ("ù", "y"), ("û", "y"),
-        ("î", "i"), ("ï", "i"), ("ô", "o"), ("ü", "y"),
+        ("é", "eː"), ("è", "ɛː"), ("ê", "ɛː"), ("ë", "ɛ"),
+        ("à", "aː"), ("â", "ɑː"), ("ù", "yː"), ("û", "yː"),
+        ("î", "iː"), ("ï", "i"), ("ô", "oː"), ("ü", "yː"),
         ("ç", "s"), ("œ", "œ"),
         // Basic
         ("a", "a"), ("b", "b"), ("c", "k"), ("d", "d"), ("e", "ə"),
@@ -133,6 +137,23 @@ final class LatinPhonemizer {
                     result += "ʒ"
                     i += 1
                     continue
+                }
+            }
+
+            // Nasal vowels: on/an/en/in/un before consonant (not before vowel or n/m)
+            if i + 1 < chars.count {
+                let pair = String(chars[i...i+1])
+                let afterNasal: Character? = (i + 2 < chars.count) ? chars[i + 2] : nil
+                let nasalFollowedByVowelOrNM = afterNasal != nil && "aeiouyéèêëàâùûîïôüœ".contains(afterNasal!) || afterNasal == "n" || afterNasal == "m"
+                if !nasalFollowedByVowelOrNM {
+                    switch pair {
+                    case "on", "om": result += "ɔ̃"; i += 2; continue
+                    case "an", "am": result += "ɑ̃"; i += 2; continue
+                    case "en", "em": result += "ɑ̃"; i += 2; continue
+                    case "in", "im": result += "ɛ̃"; i += 2; continue
+                    case "un", "um": result += "œ̃"; i += 2; continue
+                    default: break
+                    }
                 }
             }
 
@@ -168,11 +189,11 @@ final class LatinPhonemizer {
     /// Spanish is very regular — nearly 1:1 grapheme-to-phoneme.
     private static let spanishRules: [(pattern: String, ipa: String)] = [
         // Digraphs
-        ("ch", "tʃ"), ("ll", "ʝ"), ("rr", "r"), ("qu", "k"),
+        ("ch", "tʃ"), ("ll", "ʝ"), ("rr", "rː"), ("qu", "k"),
         ("gu", "ɡ"), ("gü", "ɡw"),
         ("ñ", "ɲ"),
-        // Accented vowels (same sound, just stress)
-        ("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ü", "w"),
+        // Accented vowels (stressed — add length)
+        ("á", "aː"), ("é", "eː"), ("í", "iː"), ("ó", "oː"), ("ú", "uː"), ("ü", "w"),
         // Basic
         ("a", "a"), ("b", "b"), ("c", "k"), ("d", "d"), ("e", "e"),
         ("f", "f"), ("g", "ɡ"), ("h", ""), ("i", "i"), ("j", "x"),
@@ -187,18 +208,25 @@ final class LatinPhonemizer {
         var i = 0
 
         while i < chars.count {
+            // Context: c before e/i = θ, g before e/i = x
+            if i + 1 < chars.count {
+                if chars[i] == "c" && "eiéí".contains(chars[i+1]) {
+                    result += "θ"
+                    i += 1
+                    continue
+                }
+                if chars[i] == "g" && "eiéí".contains(chars[i+1]) {
+                    result += "x"
+                    i += 1
+                    continue
+                }
+            }
+
             var matched = false
             for len in stride(from: min(2, chars.count - i), through: 1, by: -1) {
                 let substr = String(chars[i..<i+len])
                 if let rule = Self.spanishRules.first(where: { $0.pattern == substr }) {
-                    // Context: c before e/i = θ, g before e/i = x
-                    if substr == "c" && i + 1 < chars.count && "eiéí".contains(chars[i+1]) {
-                        result += "θ"
-                    } else if substr == "g" && i + 1 < chars.count && "eiéí".contains(chars[i+1]) {
-                        result += "x"
-                    } else {
-                        result += rule.ipa
-                    }
+                    result += rule.ipa
                     i += len
                     matched = true
                     break
@@ -217,20 +245,17 @@ final class LatinPhonemizer {
 
     private static let portugueseRules: [(pattern: String, ipa: String)] = [
         // Digraphs / trigraphs
-        ("ção", "sɐ̃w̃"), ("ções", "sɔ̃j̃s"), ("nh", "ɲ"), ("lh", "ʎ"),
-        ("ch", "ʃ"), ("qu", "k"), ("gu", "ɡ"), ("rr", "ʁ"),
+        ("ção", "saːw̃"), ("ções", "sõːjs"), ("nh", "ɲ"), ("lh", "ʎ"),
+        ("ch", "ʃ"), ("qu", "k"), ("gu", "ɡ"), ("rr", "ʁː"),
         ("ss", "s"), ("sc", "s"),
-        // Nasal
-        ("ão", "ɐ̃w̃"), ("ãe", "ɐ̃j̃"), ("õe", "õj̃"),
-        ("an", "ɐ̃"), ("am", "ɐ̃"), ("en", "ẽ"), ("em", "ẽ"),
-        ("in", "ĩ"), ("im", "ĩ"), ("on", "õ"), ("om", "õ"),
-        ("un", "ũ"), ("um", "ũ"),
+        // Explicit nasal diphthongs
+        ("ão", "aːw̃"), ("ãe", "aːj̃"), ("õe", "oːj̃"),
         // Accented
-        ("á", "a"), ("â", "ɐ"), ("ã", "ɐ̃"), ("é", "ɛ"), ("ê", "e"),
-        ("í", "i"), ("ó", "ɔ"), ("ô", "o"), ("õ", "õ"), ("ú", "u"),
+        ("á", "aː"), ("â", "ɐː"), ("ã", "ɐ̃ː"), ("é", "ɛː"), ("ê", "eː"),
+        ("í", "iː"), ("ó", "ɔː"), ("ô", "oː"), ("õ", "õː"), ("ú", "uː"),
         ("ç", "s"),
         // Diphthongs
-        ("ou", "o"), ("ei", "ej"), ("ai", "aj"), ("oi", "oj"),
+        ("ou", "oː"), ("ei", "eːj"), ("ai", "aːj"), ("oi", "oːj"),
         // Basic
         ("a", "a"), ("b", "b"), ("c", "k"), ("d", "d"), ("e", "e"),
         ("f", "f"), ("g", "ɡ"), ("h", ""), ("i", "i"), ("j", "ʒ"),
@@ -245,6 +270,13 @@ final class LatinPhonemizer {
         var i = 0
 
         while i < chars.count {
+            // Context: c before e/i = s
+            if i + 1 < chars.count && chars[i] == "c" && "eiéí".contains(chars[i+1]) {
+                result += "s"
+                i += 1
+                continue
+            }
+
             var matched = false
             for len in stride(from: min(4, chars.count - i), through: 1, by: -1) {
                 let substr = String(chars[i..<i+len])
