@@ -54,6 +54,7 @@ public enum HuggingFaceDownloader {
     /// Check if safetensors weights exist in a directory.
     public static func weightsExist(in directory: URL) -> Bool {
         let fm = FileManager.default
+        guard fm.fileExists(atPath: directory.path) else { return false }
         let contents: [URL]
         do {
             contents = try fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
@@ -77,8 +78,15 @@ public enum HuggingFaceDownloader {
         modelId: String,
         to directory: URL,
         additionalFiles: [String] = [],
+        offlineMode: Bool = false,
         progressHandler: ((Double) -> Void)? = nil
     ) async throws {
+        // Skip network requests when weights are already cached
+        if offlineMode && weightsExist(in: directory) {
+            progressHandler?(1.0)
+            return
+        }
+
         var globs: [String] = ["config.json"]
 
         let hasExplicitWeights = additionalFiles.contains { $0.hasSuffix(".safetensors") }
