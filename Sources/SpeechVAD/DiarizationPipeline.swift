@@ -332,9 +332,7 @@ public final class PyannoteDiarizationPipeline {
         }
 
         // Step 1: Run segmentation on all windows with adaptive batching
-        // Progress: segmentation units = windowCount, embedding units added later
-        var totalUnits = positions.count  // updated after collecting embedding tasks
-        var completedUnits = 0
+        // Progress: segmentation = 0.0–0.5, embedding = 0.5–1.0
         var windowProbs = [WindowProbs]()
 
         let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
@@ -345,8 +343,9 @@ public final class PyannoteDiarizationPipeline {
         while posIdx < positions.count {
             let batchSize = min(segSizer.currentBatchSize, positions.count - posIdx)
 
-            // Check cancellation before batch
-            if progressHandler?(Float(completedUnits) / Float(totalUnits), "Segmenting \(posIdx + 1)/\(positions.count)") == false {
+            // Check cancellation before batch (segmentation = 0.0–0.5)
+            let segProgress = Float(posIdx) / Float(max(positions.count, 1)) * 0.5
+            if progressHandler?(segProgress, "Segmenting \(posIdx + 1)/\(positions.count)") == false {
                 return emptyResult
             }
 
@@ -380,8 +379,8 @@ public final class PyannoteDiarizationPipeline {
                 }
                 windowProbs.append(WindowProbs(startSample: start, endSample: end, tracks: tracks))
 
-                completedUnits += 1
-                if progressHandler?(Float(completedUnits) / Float(totalUnits), "Segmenting \(posIdx + i + 1)/\(positions.count)") == false {
+                let winProgress = Float(posIdx + i + 1) / Float(max(positions.count, 1)) * 0.5
+                if progressHandler?(winProgress, "Segmenting \(posIdx + i + 1)/\(positions.count)") == false {
                     return emptyResult
                 }
             }
@@ -448,15 +447,12 @@ public final class PyannoteDiarizationPipeline {
             }
         }
 
-        // Update total units now that we know embedding task count
-        totalUnits = positions.count + embeddingTasks.count
-
-        // Second pass: extract embeddings (serial — MLX is not thread-safe)
+        // Second pass: extract embeddings (serial — MLX is not thread-safe, 0.5–1.0)
         var windowEmbeddings = [WindowSpeakerEmbedding]()
 
         for (i, task) in embeddingTasks.enumerated() {
-            completedUnits += 1
-            if progressHandler?(Float(completedUnits) / Float(totalUnits), "Embedding \(i + 1)/\(embeddingTasks.count)") == false {
+            let embProgress = 0.5 + Float(i) / Float(max(embeddingTasks.count, 1)) * 0.5
+            if progressHandler?(embProgress, "Embedding \(i + 1)/\(embeddingTasks.count)") == false {
                 return emptyResult
             }
 
