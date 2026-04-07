@@ -50,6 +50,13 @@ final class DiarizationPipelineTests: XCTestCase {
         let _: (PyannoteDiarizationPipeline) -> ([Float], Int, DiarizationConfig, ((Float, String) -> Bool)?) -> DiarizationResult
             = PyannoteDiarizationPipeline.diarize(audio:sampleRate:config:progressHandler:)
     }
+
+    #if canImport(CoreML)
+    func testSortformerDiarizeProgressHandlerOverloadExists() {
+        let _: (SortformerDiarizer) -> ([Float], Int, DiarizationConfig, ((Float, String) -> Bool)?) -> DiarizationResult
+            = SortformerDiarizer.diarize(audio:sampleRate:config:progressHandler:)
+    }
+    #endif
 }
 
 // MARK: - E2E Tests (require model downloads)

@@ -175,6 +175,15 @@ for seg in result.segments {
 // result.speakerEmbeddings is empty (end-to-end model)
 ```
 
+Sortformer also supports the same `progressHandler` pattern as Pyannote for progress reporting and cancellation:
+
+```swift
+let result = diarizer.diarize(audio: samples, sampleRate: 16000) { progress, stage in
+    print("[\(Int(progress * 100))%] \(stage)")
+    return !isCancelled  // return false to stop early
+}
+```
+
 ### CLI Commands
 
 ```bash
