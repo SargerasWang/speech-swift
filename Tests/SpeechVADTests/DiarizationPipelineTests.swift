@@ -47,7 +47,7 @@ final class DiarizationPipelineTests: XCTestCase {
         // Verify the progressHandler overload compiles and accepts nil.
         // We cannot call diarize() without a loaded model, but we can verify
         // the method signature exists by referencing it.
-        let _: (PyannoteDiarizationPipeline) -> ([Float], Int, DiarizationConfig, ((Float, String) -> Void)?) -> DiarizationResult
+        let _: (PyannoteDiarizationPipeline) -> ([Float], Int, DiarizationConfig, ((Float, String) -> Bool)?) -> DiarizationResult
             = PyannoteDiarizationPipeline.diarize(audio:sampleRate:config:progressHandler:)
     }
 }
@@ -71,6 +71,7 @@ final class E2EDiarizationPipelineTests: XCTestCase {
         let result = pipeline.diarize(audio: audio, sampleRate: sampleRate, config: .default) { progress, stage in
             progressValues.append(progress)
             stageMessages.append(stage)
+            return true
         }
 
         // Silent audio should produce empty result
@@ -90,6 +91,27 @@ final class E2EDiarizationPipelineTests: XCTestCase {
                 XCTAssertLessThanOrEqual(p, 1)
             }
         }
+    }
+
+    func testDiarizeCancellationReturnsEmptyResult() async throws {
+        let pipeline = try await PyannoteDiarizationPipeline.fromPretrained(
+            embeddingEngine: .mlx
+        )
+
+        // Generate 30 seconds of audio so there are multiple windows to process
+        let audio = [Float](repeating: 0, count: 16000 * 30)
+
+        var callCount = 0
+        let result = pipeline.diarize(audio: audio, sampleRate: 16000, config: .default) { _, _ in
+            callCount += 1
+            // Cancel after the first progress callback
+            return callCount < 2
+        }
+
+        // Cancelled early — should return empty result
+        XCTAssertEqual(result.segments.count, 0)
+        XCTAssertEqual(result.numSpeakers, 0)
+        XCTAssertTrue(result.speakerEmbeddings.isEmpty)
     }
 
     func testDiarizeWithoutProgressHandlerStillWorks() async throws {

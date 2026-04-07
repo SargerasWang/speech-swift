@@ -192,29 +192,35 @@ public final class PyannoteDiarizationPipeline {
         diarize(audio: audio, sampleRate: sampleRate, config: config, progressHandler: nil)
     }
 
-    /// Diarize audio with progress reporting.
+    /// Diarize audio with progress reporting and optional cancellation.
     ///
     /// Same as `diarize(audio:sampleRate:config:)` but reports progress during
     /// the two most expensive stages (segmentation and embedding extraction).
+    /// The handler returns a `Bool`: `true` to continue, `false` to cancel.
+    /// When cancelled, an empty `DiarizationResult` is returned immediately.
     ///
     /// - Parameters:
     ///   - audio: PCM Float32 audio samples
     ///   - sampleRate: sample rate of the input audio
     ///   - config: diarization configuration
-    ///   - progressHandler: called with (progress 0.0–1.0, stage description)
+    ///   - progressHandler: called with (progress 0.0–1.0, stage description);
+    ///     return `true` to continue or `false` to cancel
     /// - Returns: diarization result with speaker-labeled segments
     public func diarize(
         audio: [Float],
         sampleRate: Int,
         config: DiarizationConfig = .default,
-        progressHandler: ((Float, String) -> Void)?
+        progressHandler: ((Float, String) -> Bool)?
     ) -> DiarizationResult {
+        let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
         let samples = DiarizationHelpers.resample(audio, from: sampleRate, to: segConfig.sampleRate)
 
         // Stage 0 (optional): VAD pre-filter — mask non-speech to reduce false alarms
         let speechMask: [SpeechSegment]?
         if let vadModel {
-            progressHandler?(0, "VAD pre-filtering")
+            if progressHandler?(0, "VAD pre-filtering") == false {
+                return emptyResult
+            }
             speechMask = vadModel.detectSpeech(
                 audio: samples, sampleRate: segConfig.sampleRate)
         } else {
@@ -222,7 +228,7 @@ public final class PyannoteDiarizationPipeline {
         }
 
         if let speechMask, speechMask.isEmpty {
-            return DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
+            return emptyResult
         }
 
         // Run embedding-clustered diarization pipeline
@@ -296,7 +302,7 @@ public final class PyannoteDiarizationPipeline {
         samples: [Float],
         config: DiarizationConfig,
         speechMask: [SpeechSegment]?,
-        progressHandler: ((Float, String) -> Void)? = nil
+        progressHandler: ((Float, String) -> Bool)? = nil
     ) -> DiarizationResult {
         let windowDuration: Float = 10.0
         let sampleRate = segConfig.sampleRate
@@ -331,9 +337,13 @@ public final class PyannoteDiarizationPipeline {
         var completedUnits = 0
         var windowProbs = [WindowProbs]()
 
+        let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
+
         for (posIdx, (start, end)) in positions.enumerated() {
             completedUnits += 1
-            progressHandler?(Float(completedUnits) / Float(totalUnits), "Segmenting \(posIdx + 1)/\(positions.count)")
+            if progressHandler?(Float(completedUnits) / Float(totalUnits), "Segmenting \(posIdx + 1)/\(positions.count)") == false {
+                return emptyResult
+            }
 
             var window = Array(samples[start..<end])
             if window.count < windowSamples {
@@ -362,7 +372,9 @@ public final class PyannoteDiarizationPipeline {
 
         for (wIdx, wp) in windowProbs.enumerated() {
             completedUnits += 1
-            progressHandler?(Float(completedUnits) / Float(totalUnits), "Embedding \(wIdx + 1)/\(windowProbs.count)")
+            if progressHandler?(Float(completedUnits) / Float(totalUnits), "Embedding \(wIdx + 1)/\(windowProbs.count)") == false {
+                return emptyResult
+            }
 
             let windowStartSample = wp.startSample
 
