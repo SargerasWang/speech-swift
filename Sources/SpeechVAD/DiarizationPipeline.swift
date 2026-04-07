@@ -332,8 +332,8 @@ public final class PyannoteDiarizationPipeline {
         }
 
         // Step 1: Run segmentation on all windows with adaptive batching
-        // Progress: both steps iterate over all windows, so total = 2 * windowCount
-        let totalUnits = positions.count * 2
+        // Progress: segmentation units = windowCount, embedding units added later
+        var totalUnits = positions.count  // updated after collecting embedding tasks
         var completedUnits = 0
         var windowProbs = [WindowProbs]()
 
@@ -447,6 +447,9 @@ public final class PyannoteDiarizationPipeline {
                 embeddingTasks.append(EmbeddingTask(windowIndex: wIdx, localSpeakerId: localSpk, audio: spkAudio))
             }
         }
+
+        // Update total units now that we know embedding task count
+        totalUnits = positions.count + embeddingTasks.count
 
         // Second pass: extract embeddings (serial — MLX is not thread-safe)
         var windowEmbeddings = [WindowSpeakerEmbedding]()
