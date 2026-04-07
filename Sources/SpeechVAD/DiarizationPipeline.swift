@@ -337,7 +337,7 @@ public final class PyannoteDiarizationPipeline {
 
         let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
 
-        var segSizer = AdaptiveBatchSizer()
+        var segSizer = AdaptiveBatchSizer(maxBatchSize: 1)  // TODO: restore after debugging
         var posIdx = 0
 
         while posIdx < positions.count {
