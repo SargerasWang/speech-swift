@@ -96,9 +96,7 @@ public final class SortformerDiarizer {
         }
 
         let mlConfig = MLModelConfiguration()
-        // macOS/iOS 26+ has ANE compiler regressions for pipeline models;
-        // .all routes to GPU which is faster than CPU fallback
-        mlConfig.computeUnits = .all
+        mlConfig.computeUnits = .cpuAndNeuralEngine
 
         let mlModel: MLModel
         do {
