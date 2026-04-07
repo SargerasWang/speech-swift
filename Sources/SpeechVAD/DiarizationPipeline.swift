@@ -331,7 +331,7 @@ public final class PyannoteDiarizationPipeline {
             }
         }
 
-        // Step 1: Run segmentation on all windows, collect probability tracks
+        // Step 1: Run segmentation on all windows with adaptive batching
         // Progress: both steps iterate over all windows, so total = 2 * windowCount
         let totalUnits = positions.count * 2
         var completedUnits = 0
@@ -339,56 +339,83 @@ public final class PyannoteDiarizationPipeline {
 
         let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
 
-        for (posIdx, (start, end)) in positions.enumerated() {
-            completedUnits += 1
+        var segSizer = AdaptiveBatchSizer()
+        var posIdx = 0
+
+        while posIdx < positions.count {
+            let batchSize = min(segSizer.currentBatchSize, positions.count - posIdx)
+
+            // Check cancellation before batch
             if progressHandler?(Float(completedUnits) / Float(totalUnits), "Segmenting \(posIdx + 1)/\(positions.count)") == false {
                 return emptyResult
             }
 
-            var window = Array(samples[start..<end])
-            if window.count < windowSamples {
-                window.append(contentsOf: [Float](repeating: 0, count: windowSamples - window.count))
+            // Build batched input: [N, 1, windowSamples]
+            let batchStart = CFAbsoluteTimeGetCurrent()
+            var windowArrays = [MLXArray]()
+            for i in 0..<batchSize {
+                let (start, end) = positions[posIdx + i]
+                var window = Array(samples[start..<end])
+                if window.count < windowSamples {
+                    window.append(contentsOf: [Float](repeating: 0, count: windowSamples - window.count))
+                }
+                windowArrays.append(MLXArray(window).reshaped(1, 1, windowSamples))
+            }
+            let batchInput = concatenated(windowArrays, axis: 0)
+
+            // Run segmentation model on batch
+            let batchPosteriors = segmentationModel(batchInput)
+            let batchSpeakerProbs = PowersetDecoder.speakerProbabilities(from: batchPosteriors)
+            eval(batchSpeakerProbs)
+
+            let batchElapsed = CFAbsoluteTimeGetCurrent() - batchStart
+            segSizer.reportCompletion(itemsProcessed: batchSize, elapsedSeconds: batchElapsed)
+
+            // Extract per-window results and report progress
+            for i in 0..<batchSize {
+                let (start, end) = positions[posIdx + i]
+                var tracks = [[Float]]()
+                for spk in 0..<3 {
+                    tracks.append(batchSpeakerProbs[i, 0..., spk].asArray(Float.self))
+                }
+                windowProbs.append(WindowProbs(startSample: start, endSample: end, tracks: tracks))
+
+                completedUnits += 1
+                if progressHandler?(Float(completedUnits) / Float(totalUnits), "Segmenting \(posIdx + i + 1)/\(positions.count)") == false {
+                    return emptyResult
+                }
             }
 
-            let input = MLXArray(window).reshaped(1, 1, windowSamples)
-            let posteriors = segmentationModel(input)
-            let speakerProbs = PowersetDecoder.speakerProbabilities(from: posteriors)
-            eval(speakerProbs)
-
-            var tracks = [[Float]]()
-            for spk in 0..<3 {
-                tracks.append(speakerProbs[0, 0..., spk].asArray(Float.self))
-            }
-            windowProbs.append(WindowProbs(startSample: start, endSample: end, tracks: tracks))
+            posIdx += batchSize
         }
 
         guard !windowProbs.isEmpty else {
             return DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
         }
 
-        // Step 2: Extract per-window per-speaker embeddings from non-overlapping speech
+        // Step 2: Extract per-window per-speaker embeddings
+        // First pass: collect all audio clips that need embedding (CPU work)
         let minEmbeddingSamples = sampleRate / 2  // 0.5s minimum for embedding
-        var windowEmbeddings = [WindowSpeakerEmbedding]()
+
+        struct EmbeddingTask {
+            let windowIndex: Int
+            let localSpeakerId: Int
+            let audio: [Float]
+        }
+        var embeddingTasks = [EmbeddingTask]()
 
         for (wIdx, wp) in windowProbs.enumerated() {
-            completedUnits += 1
-            if progressHandler?(Float(completedUnits) / Float(totalUnits), "Embedding \(wIdx + 1)/\(windowProbs.count)") == false {
-                return emptyResult
-            }
-
             let windowStartSample = wp.startSample
 
             for localSpk in 0..<3 {
                 let probs = wp.tracks[localSpk]
 
-                // Binarize this speaker's track
                 let binarySegments = PowersetDecoder.binarize(
                     probs: probs, onset: config.onset,
                     offset: config.offset, frameDuration: frameDuration)
 
                 guard !binarySegments.isEmpty else { continue }
 
-                // Collect audio from frames where ONLY this speaker is active (non-overlapping)
                 var spkAudio = [Float]()
 
                 for seg in binarySegments {
@@ -396,7 +423,6 @@ public final class PyannoteDiarizationPipeline {
                     let segEndFrame = min(Int(seg.endTime / frameDuration), probs.count)
 
                     for frame in segStartFrame..<segEndFrame {
-                        // Check if other speakers are below offset at this frame
                         var otherActive = false
                         for otherSpk in 0..<3 where otherSpk != localSpk {
                             if wp.tracks[otherSpk][frame] >= config.offset {
@@ -406,7 +432,6 @@ public final class PyannoteDiarizationPipeline {
                         }
                         if otherActive { continue }
 
-                        // Extract audio samples for this frame
                         let frameStartSample = windowStartSample + Int(Float(frame) * frameDuration * Float(sampleRate))
                         let frameEndSample = min(
                             windowStartSample + Int(Float(frame + 1) * frameDuration * Float(sampleRate)),
@@ -418,13 +443,25 @@ public final class PyannoteDiarizationPipeline {
                     }
                 }
 
-                // Need minimum 0.5s of audio for a reliable embedding
                 guard spkAudio.count >= minEmbeddingSamples else { continue }
-
-                let embedding = embeddingModel.embed(audio: spkAudio, sampleRate: sampleRate)
-                windowEmbeddings.append(WindowSpeakerEmbedding(
-                    windowIndex: wIdx, localSpeakerId: localSpk, embedding: embedding))
+                embeddingTasks.append(EmbeddingTask(windowIndex: wIdx, localSpeakerId: localSpk, audio: spkAudio))
             }
+        }
+
+        // Second pass: extract embeddings (serial — MLX is not thread-safe)
+        var windowEmbeddings = [WindowSpeakerEmbedding]()
+
+        for (i, task) in embeddingTasks.enumerated() {
+            completedUnits += 1
+            if progressHandler?(Float(completedUnits) / Float(totalUnits), "Embedding \(i + 1)/\(embeddingTasks.count)") == false {
+                return emptyResult
+            }
+
+            let embedding = embeddingModel.embed(audio: task.audio, sampleRate: sampleRate)
+            windowEmbeddings.append(WindowSpeakerEmbedding(
+                windowIndex: task.windowIndex,
+                localSpeakerId: task.localSpeakerId,
+                embedding: embedding))
         }
 
         // Handle edge case: no embeddings could be extracted
