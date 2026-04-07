@@ -337,7 +337,7 @@ public final class PyannoteDiarizationPipeline {
         }
 
         // Step 1: Run segmentation on all windows with adaptive batching
-        // Progress: segmentation = 0.0–0.5, embedding = 0.5–1.0
+        // Progress: segmentation = 0.0–0.4, embedding = 0.4–0.8, clustering = 0.8–1.0
         var windowProbs = [WindowProbs]()
 
         let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
@@ -352,7 +352,7 @@ public final class PyannoteDiarizationPipeline {
             let batchSize = min(segSizer.currentBatchSize, positions.count - posIdx)
 
             // Check cancellation before batch (segmentation = 0.0–0.5)
-            let segProgress = Float(posIdx) / Float(max(positions.count, 1)) * 0.5
+            let segProgress = Float(posIdx) / Float(max(positions.count, 1)) * 0.4
             if progressHandler?(segProgress, "Segmenting \(posIdx + 1)/\(positions.count)") == false {
                 return emptyResult
             }
@@ -387,7 +387,7 @@ public final class PyannoteDiarizationPipeline {
                 }
                 windowProbs.append(WindowProbs(startSample: start, endSample: end, tracks: tracks))
 
-                let winProgress = Float(posIdx + i + 1) / Float(max(positions.count, 1)) * 0.5
+                let winProgress = Float(posIdx + i + 1) / Float(max(positions.count, 1)) * 0.4
                 if progressHandler?(winProgress, "Segmenting \(posIdx + i + 1)/\(positions.count)") == false {
                     return emptyResult
                 }
@@ -459,7 +459,7 @@ public final class PyannoteDiarizationPipeline {
         var windowEmbeddings = [WindowSpeakerEmbedding]()
 
         for (i, task) in embeddingTasks.enumerated() {
-            let embProgress = 0.5 + Float(i) / Float(max(embeddingTasks.count, 1)) * 0.5
+            let embProgress = 0.4 + Float(i) / Float(max(embeddingTasks.count, 1)) * 0.4
             if progressHandler?(embProgress, "Embedding \(i + 1)/\(embeddingTasks.count)") == false {
                 return emptyResult
             }
@@ -485,7 +485,11 @@ public final class PyannoteDiarizationPipeline {
         }
 
         let (clusterAssignment, centroids) = DiarizationHelpers.constrainedAgglomerativeClustering(
-            items: clusterItems, threshold: config.clusteringThreshold)
+            items: clusterItems, threshold: config.clusteringThreshold,
+            progressHandler: { clusterProgress, stage in
+                let totalProgress = 0.8 + clusterProgress * 0.2
+                return progressHandler?(totalProgress, stage) ?? true
+            })
 
         // Build mapping: (windowIndex, localSpeakerId) → global cluster ID
         var localToGlobal = [Int: [Int: Int]]()  // windowIndex → (localSpeakerId → globalId)

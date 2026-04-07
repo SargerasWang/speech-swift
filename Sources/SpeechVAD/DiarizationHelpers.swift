@@ -82,7 +82,8 @@ enum DiarizationHelpers {
     /// - Returns: cluster assignment for each item, and cluster centroids
     static func constrainedAgglomerativeClustering(
         items: [ClusterItem],
-        threshold: Float
+        threshold: Float,
+        progressHandler: ((Float, String) -> Bool)? = nil
     ) -> (clusterAssignment: [Int], centroids: [[Float]]) {
         guard !items.isEmpty else { return ([], []) }
         if items.count == 1 {
@@ -100,7 +101,18 @@ enum DiarizationHelpers {
         var clusterWindows = items.map { Set([$0.windowIndex]) }
         var active = Set(0..<n)
 
+        let initialCount = active.count
+        var mergeStep = 0
+
         while active.count > 1 {
+            mergeStep += 1
+            if mergeStep % 10 == 0 {  // report every 10 merges to avoid callback overhead
+                let progress = Float(initialCount - active.count) / Float(max(initialCount - 1, 1))
+                if progressHandler?(progress, "Clustering \(active.count) clusters") == false {
+                    break
+                }
+            }
+
             // Find closest unconstrained pair
             var bestDist: Float = Float.greatestFiniteMagnitude
             var bestI = -1, bestJ = -1
