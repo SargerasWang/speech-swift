@@ -20,19 +20,24 @@ public struct DiarizationConfig: Sendable {
     /// Cosine distance threshold for merging speaker clusters (0.0-2.0).
     /// Lower = more merges (fewer speakers). Default 0.715.
     public var clusteringThreshold: Float
+    /// Segmentation batch size for GPU processing.
+    /// 0 = adaptive (auto-discover optimal size), 1 = serial, N = fixed batch.
+    public var segmentationBatchSize: Int
 
     public init(
         onset: Float = 0.5,
         offset: Float = 0.3,
         minSpeechDuration: Float = 0.3,
         minSilenceDuration: Float = 0.15,
-        clusteringThreshold: Float = 0.715
+        clusteringThreshold: Float = 0.715,
+        segmentationBatchSize: Int = 0
     ) {
         self.onset = onset
         self.offset = offset
         self.minSpeechDuration = minSpeechDuration
         self.minSilenceDuration = minSilenceDuration
         self.clusteringThreshold = clusteringThreshold
+        self.segmentationBatchSize = segmentationBatchSize
     }
 
     public static let `default` = DiarizationConfig()
@@ -337,7 +342,10 @@ public final class PyannoteDiarizationPipeline {
 
         let emptyResult = DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
 
-        var segSizer = AdaptiveBatchSizer(maxBatchSize: 1)  // TODO: restore after debugging
+        let segBatch = config.segmentationBatchSize
+        var segSizer = segBatch > 0
+            ? AdaptiveBatchSizer.fixed(segBatch)  // fixed batch size
+            : AdaptiveBatchSizer()  // adaptive (slow-start)
         var posIdx = 0
 
         while posIdx < positions.count {

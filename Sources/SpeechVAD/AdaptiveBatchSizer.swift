@@ -35,6 +35,14 @@ struct AdaptiveBatchSizer {
         self.maxBatchSize = maxBatchSize
     }
 
+    /// Create a sizer locked at a fixed batch size (no adaptation).
+    static func fixed(_ batchSize: Int) -> AdaptiveBatchSizer {
+        var sizer = AdaptiveBatchSizer(maxBatchSize: batchSize)
+        sizer.currentBatchSize = batchSize
+        sizer.isLocked = true
+        return sizer
+    }
+
     /// Report that a batch completed successfully.
     ///
     /// Updates the batch size based on throughput comparison:
