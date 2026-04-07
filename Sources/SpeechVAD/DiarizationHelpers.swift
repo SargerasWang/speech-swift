@@ -66,9 +66,23 @@ enum DiarizationHelpers {
 
     /// Item for constrained agglomerative clustering.
     struct ClusterItem {
-        let windowIndex: Int
+        /// Window indices covered by this item (multiple after pre-merging)
+        let windowIndices: Set<Int>
         let localSpeakerId: Int
         let embedding: [Float]
+
+        /// Convenience init for a single window
+        init(windowIndex: Int, localSpeakerId: Int, embedding: [Float]) {
+            self.windowIndices = [windowIndex]
+            self.localSpeakerId = localSpeakerId
+            self.embedding = embedding
+        }
+
+        init(windowIndices: Set<Int>, localSpeakerId: Int, embedding: [Float]) {
+            self.windowIndices = windowIndices
+            self.localSpeakerId = localSpeakerId
+            self.embedding = embedding
+        }
     }
 
     /// Constrained agglomerative clustering with centroid linkage and cosine distance.
@@ -98,7 +112,7 @@ enum DiarizationHelpers {
         var centroids = items.map { $0.embedding }  // cluster ID → centroid
         var clusterMembers = (0..<n).map { [$0] }  // cluster ID → member items
         // Window indices per cluster (for constraint checking)
-        var clusterWindows = items.map { Set([$0.windowIndex]) }
+        var clusterWindows = items.map { $0.windowIndices }
         var active = Set(0..<n)
 
         let initialCount = active.count

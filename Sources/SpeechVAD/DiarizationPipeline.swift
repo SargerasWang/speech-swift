@@ -476,10 +476,14 @@ public final class PyannoteDiarizationPipeline {
             return DiarizationResult(segments: [], numSpeakers: 0, speakerEmbeddings: [])
         }
 
+        // Step 2.5: Pre-merge adjacent windows with similar embeddings
+        // Reduces N from ~662 to ~50-100 before O(N³) clustering
+        let mergedEmbeddings = premergeAdjacentEmbeddings(windowEmbeddings, similarityThreshold: 0.8)
+
         // Step 3: Constrained agglomerative clustering
-        let clusterItems = windowEmbeddings.map {
+        let clusterItems = mergedEmbeddings.map {
             DiarizationHelpers.ClusterItem(
-                windowIndex: $0.windowIndex,
+                windowIndices: $0.windowIndices,
                 localSpeakerId: $0.localSpeakerId,
                 embedding: $0.embedding)
         }
@@ -492,9 +496,12 @@ public final class PyannoteDiarizationPipeline {
             })
 
         // Build mapping: (windowIndex, localSpeakerId) → global cluster ID
+        // Expand merged items back to all original window indices
         var localToGlobal = [Int: [Int: Int]]()  // windowIndex → (localSpeakerId → globalId)
-        for (i, we) in windowEmbeddings.enumerated() {
-            localToGlobal[we.windowIndex, default: [:]][we.localSpeakerId] = clusterAssignment[i]
+        for (i, me) in mergedEmbeddings.enumerated() {
+            for wIdx in me.windowIndices {
+                localToGlobal[wIdx, default: [:]][me.localSpeakerId] = clusterAssignment[i]
+            }
         }
 
         // Step 4: Build segments with global speaker IDs
@@ -582,6 +589,73 @@ public final class PyannoteDiarizationPipeline {
             numSpeakers: numSpeakers,
             speakerEmbeddings: finalCentroids
         )
+    }
+
+    /// Pre-merged embedding result, covering multiple adjacent windows.
+    private struct MergedEmbedding {
+        var windowIndices: Set<Int>
+        let localSpeakerId: Int
+        var embedding: [Float]
+        var count: Int  // number of merged embeddings (for weighted average)
+    }
+
+    /// Pre-merge adjacent window embeddings with high similarity.
+    ///
+    /// Groups by localSpeakerId, sorts by windowIndex, and merges consecutive
+    /// items with cosine similarity above the threshold. Reduces N for clustering.
+    private func premergeAdjacentEmbeddings(
+        _ embeddings: [WindowSpeakerEmbedding],
+        similarityThreshold: Float
+    ) -> [MergedEmbedding] {
+        // Group by localSpeakerId
+        var groups = [Int: [WindowSpeakerEmbedding]]()
+        for e in embeddings {
+            groups[e.localSpeakerId, default: []].append(e)
+        }
+
+        var result = [MergedEmbedding]()
+
+        for (spkId, items) in groups {
+            let sorted = items.sorted { $0.windowIndex < $1.windowIndex }
+            guard let first = sorted.first else { continue }
+
+            var current = MergedEmbedding(
+                windowIndices: [first.windowIndex],
+                localSpeakerId: spkId,
+                embedding: first.embedding,
+                count: 1
+            )
+
+            for i in 1..<sorted.count {
+                let item = sorted[i]
+                let isAdjacent = item.windowIndex - sorted[i - 1].windowIndex <= 1
+                let similarity = 1.0 - DiarizationHelpers.cosineDistance(current.embedding, item.embedding)
+
+                if isAdjacent && similarity >= similarityThreshold {
+                    // Merge: weighted average of embeddings
+                    let w1 = Float(current.count)
+                    let w2: Float = 1.0
+                    let total = w1 + w2
+                    current.embedding = zip(current.embedding, item.embedding).map {
+                        ($0 * w1 + $1 * w2) / total
+                    }
+                    current.windowIndices.insert(item.windowIndex)
+                    current.count += 1
+                } else {
+                    // Start new group
+                    result.append(current)
+                    current = MergedEmbedding(
+                        windowIndices: [item.windowIndex],
+                        localSpeakerId: spkId,
+                        embedding: item.embedding,
+                        count: 1
+                    )
+                }
+            }
+            result.append(current)
+        }
+
+        return result
     }
 
     /// Trim a segment to intersect with speech regions.
