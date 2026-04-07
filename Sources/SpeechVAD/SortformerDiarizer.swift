@@ -71,24 +71,20 @@ public final class SortformerDiarizer {
         progressHandler?(0.0, "Downloading Sortformer model...")
 
         let cacheDir = try cacheDir ?? HuggingFaceDownloader.getCacheDirectory(for: modelId)
-        let modelURL = cacheDir.appendingPathComponent("Sortformer.mlmodelc", isDirectory: true)
 
-        // weightsExist() only checks for .safetensors files, which CoreML
-        // models don't have. Check for Sortformer.mlmodelc directly to
-        // avoid unnecessary network requests when the model is cached.
-        if !(offlineMode && FileManager.default.fileExists(atPath: modelURL.path)) {
-            try await HuggingFaceDownloader.downloadWeights(
-                modelId: modelId,
-                to: cacheDir,
-                additionalFiles: ["Sortformer.mlmodelc/**", "config.json"],
-                offlineMode: offlineMode,
-                progressHandler: { progress in
-                    progressHandler?(progress * 0.8, "Downloading Sortformer model...")
-                }
-            )
-        }
+        try await HuggingFaceDownloader.downloadWeights(
+            modelId: modelId,
+            to: cacheDir,
+            additionalFiles: ["Sortformer.mlmodelc/**", "config.json"],
+            offlineMode: offlineMode,
+            progressHandler: { progress in
+                progressHandler?(progress * 0.8, "Downloading Sortformer model...")
+            }
+        )
 
         progressHandler?(0.8, "Loading CoreML model...")
+
+        let modelURL = cacheDir.appendingPathComponent("Sortformer.mlmodelc", isDirectory: true)
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
             throw AudioModelError.modelLoadFailed(
                 modelId: modelId,
