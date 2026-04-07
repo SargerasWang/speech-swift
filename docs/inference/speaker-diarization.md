@@ -115,6 +115,18 @@ for seg in result.segments {
 print("\(result.numSpeakers) speakers detected")
 ```
 
+#### Progress Reporting
+
+For long audio files, use the `progressHandler` overload to track progress:
+
+```swift
+let result = pipeline.diarize(audio: samples, sampleRate: 16000) { progress, stage in
+    print("[\(Int(progress * 100))%] \(stage)")
+}
+```
+
+Progress is based on completed work units (segmentation windows + embedding windows). The `stage` string indicates the current processing step (e.g. "Segmenting 5/12", "Embedding 3/12").
+
 ### Speaker Embedding
 
 ```swift
